@@ -9,6 +9,7 @@ Matching, evidence bundling and the blockchain anchor are not wired yet.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -22,7 +23,9 @@ from src.discovery.base import (
 from src.discovery.google_lens import GoogleLensProvider
 from src.discovery.retrieval import CandidateRetriever
 from src.discovery import normalizer
+from src.matching import ranker
 from src.evidence.collector import ArtifactStore, new_investigation_id, utc_now_iso
+from src.matching.ranker import CandidateMatcher
 from src.models import CandidateStatus, ImageStatus, SearchResult
 from src.pipeline import banner, die, fail, info, ok, stage, warn
 from src.vision.detector import model_info
@@ -175,11 +178,91 @@ def main() -> int:
 
     store.write_json("retrieval.json", [r.to_dict() for r in fetched])
 
+    # -- 05 matching -------------------------------------------------
+    stage("05", f"FACE MATCHING  (threshold {CONFIG.match.threshold})")
+    if not retrieved:
+        warn("no candidate images were retrievable; nothing to match")
+        store.write_json("matching.json",
+                         {"threshold": CONFIG.match.threshold, "candidates": []})
+        print(f"\nartifacts: {store.relative(store.root)}")
+        return 0
+
+    input_sha256 = hashlib.sha256(image_path.read_bytes()).hexdigest()
+    matcher = CandidateMatcher(embedder=embedder, input_sha256=input_sha256,
+                               logger=lambda line: print("  " + line))
+    matches = matcher.evaluate_all(emb, fetched)
+    ranked = ranker.rank(matches)
+    dist = ranker.distribution(matches)
+
+    tally: dict[str, int] = {}
+    for m in matches:
+        tally[m.status.value] = tally.get(m.status.value, 0) + 1
+
+    print()
+    ok(f"{sum(1 for m in matches if m.best_similarity is not None)} candidates scored")
+    for state, n in sorted(tally.items(), key=lambda kv: -kv[1]):
+        info(f"{state:<22} {n}")
+    if dist.get("n"):
+        info(f"similarity  n={dist['n']}  min={dist['min']:.4f}  "
+             f"median={dist['median']:.4f}  max={dist['max']:.4f}  sd={dist['sd']:.4f}")
+
+    # -- 06 ranking --------------------------------------------------
+    stage("06", "RANKING")
+    for i, m in enumerate(ranked[:10], start=1):
+        if m.best_similarity is None:
+            continue
+        flag = "MATCH" if m.is_match else "     "
+        same = "  [SAME FILE AS INPUT]" if m.identical_to_input else ""
+        print(f"  #{i:02d}  {m.best_similarity:.4f}  {flag}  "
+              f"{m.candidate.source_domain:<30} face #{m.best_face_index}"
+              f"/{m.faces_detected}{same}")
+
+    selected = ranker.best_match(matches)
+    independent = ranker.best_independent_match(matches)
+    store.write_json("matching.json", {
+        "threshold": CONFIG.match.threshold,
+        "input_sha256": input_sha256,
+        "target_image": str(image_path).replace("\\", "/"),
+        "detector": mi["detector"],
+        "face_model": mi["recognizer_file"],
+        "distribution": dist,
+        "selected": selected.to_dict() if selected else None,
+        "best_independent": independent.to_dict() if independent else None,
+        "candidates": [m.to_dict() for m in ranked],
+    })
+
+    print()
+    if selected is None:
+        warn(f"NO CANDIDATE REACHED THE THRESHOLD ({CONFIG.match.threshold})")
+        info("candidates were scored; none matched")
+        info("the threshold is NOT lowered to force a result")
+    else:
+        ok(f"selected candidate  similarity {selected.best_similarity:.4f}"
+           f"  ({selected.status.value})")
+        info(f"url     {selected.candidate.url}")
+        info(f"domain  {selected.candidate.source_domain}")
+        info(f"face    #{selected.best_face_index} of {selected.faces_detected} "
+             f"detected in the candidate image")
+        if selected.status is CandidateStatus.MULTIPLE_FACE_MATCH:
+            info("NOTE: this image contains several faces. One of them matches "
+                 "the target; the image as a whole does not.")
+        if selected.identical_to_input:
+            warn("this candidate is BYTE-IDENTICAL to the input image")
+            info("that locates the source file; it is not independent corroboration")
+            if independent is not None:
+                info("")
+                ok(f"best independent match  similarity "
+                   f"{independent.best_similarity:.4f}  ({independent.status.value})")
+                info(f"url     {independent.candidate.url}")
+                info(f"domain  {independent.candidate.source_domain}")
+                info(f"face    #{independent.best_face_index} of "
+                     f"{independent.faces_detected} detected")
+
     print(f"\nartifacts: {store.relative(store.root)}")
     for f in sorted(store.root.iterdir()):
         print(f"  {f.name}  ({f.stat().st_size} bytes)")
 
-    print("\n  Phase 2 (face matching against retrieved candidates) is not wired yet.")
+    print("\n  Phase 3 (evidence bundle + SHA-256) is not wired yet.")
     return 0
 
 

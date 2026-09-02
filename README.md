@@ -5,10 +5,10 @@ search, candidate images are independently re-matched locally, and the
 resulting evidence bundle is fingerprinted and anchored on Polygon Amoy so its
 integrity can be re-verified later.
 
-> **Status: Phases 0-1 complete.** Local vision and live reverse-image
-> discovery with isolated candidate retrieval are implemented and tested.
-> Face matching against candidates, evidence bundling and the blockchain
-> anchor are not built yet.
+> **Status: Phases 0-2 complete.** Local vision, live reverse-image discovery
+> with isolated candidate retrieval, and independent face matching with
+> ranking are implemented and tested. Evidence bundling, deterministic
+> hashing and the blockchain anchor are not built yet.
 
 ## Pipeline
 
@@ -119,8 +119,52 @@ input.jpg              the image as submitted
 search-request.json    provider, image_id, search_id, timestamp, live flag
 search-response.json   the raw provider response, unmodified
 candidates.json        normalized candidates
-retrieval.json         per-candidate outcome, status, timing, bytes
+retrieval.json         per-candidate outcome, status, timing, bytes, sha256
+matching.json          threshold, distribution, per-face similarities,
+                       selected match and best independent match
 ```
+
+## Face matching (Phase 2)
+
+Each retrieved candidate is scored independently against the target
+embedding:
+
+```text
+candidate image -> validate -> detect all faces -> per-face quality gate
+  -> ArcFace embedding per face -> cosine similarity vs target
+  -> threshold -> ranked candidates
+```
+
+### Multiple-face policy
+
+Every usable face in a candidate is embedded and scored. The candidate takes
+the **highest** per-face similarity and records which face won. When the image
+contains more than one face the status is `MULTIPLE_FACE_MATCH`, never plain
+`MATCH` — so the record states *"one face in this image matches the target"*
+and never *"this image is the target"*. Ties resolve to the lower face index;
+faces are ordered largest-first, so the larger face wins. Every per-face
+similarity is stored, not just the winner.
+
+### Statuses
+
+`MATCH` (single face, at or above threshold) · `MULTIPLE_FACE_MATCH` (≥2
+faces, best one clears it) · `REJECTED` (faces found, best below threshold) ·
+`NO_FACE` · `LOW_QUALITY` (faces found, none passed the quality gate) ·
+plus every retrieval status carried through unchanged (`HTTP_403`,
+`HTTP_404`, `HTTP_ERROR`, `TIMEOUT`, `INVALID_IMAGE`, `FETCH_FAILED`,
+`TOO_LARGE`, `NO_IMAGE_URL`).
+
+Ranking uses measured identity similarity only — never URL, domain or search
+position. The threshold comes from `FACE_MATCH_THRESHOLD` and is **never
+lowered at runtime to force a match**; when nothing clears it the run says so.
+
+### Re-finding the input
+
+A reverse image search usually rediscovers the input file itself. Candidates
+whose bytes hash to the input's SHA-256 are flagged `identical_to_input` and
+reported as `[SAME FILE AS INPUT]`. That locates the source but is **not**
+independent corroboration, so the run also reports `best_independent`: the
+highest-scoring match that is a genuinely different file.
 
 ## Run
 

@@ -8,6 +8,7 @@ Retrieval stops at a decoded image. Face detection and matching are Phase 2.
 """
 from __future__ import annotations
 
+import hashlib
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Iterable
@@ -76,6 +77,7 @@ class CandidateRetriever:
                     chunks.append(chunk)
                 body = b"".join(chunks)
                 result.bytes_downloaded = len(body)
+                result.content_sha256 = hashlib.sha256(body).hexdigest()
 
         except requests.Timeout:
             result.status = CandidateStatus.TIMEOUT

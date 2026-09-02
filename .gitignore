@@ -15,8 +15,14 @@ evidence/*
 !evidence/.gitkeep
 cache/*
 !cache/.gitkeep
+# Inputs are ignored by default, but the two pipeline fixtures are tracked:
+#   target.jpg      - Phase 1 discovery/regression fixture (do not delete)
+#   demo-target.jpg - final-demo target, verified single face
 inputs/*
 !inputs/.gitkeep
+!inputs/target.jpg
+!inputs/demo-target.jpg
+!inputs/demo-target.jpg.source.json
 
 # Test corpus: the images are redownloadable, the manifest that names them
 # is not - it records which candidates a human actually confirmed.
