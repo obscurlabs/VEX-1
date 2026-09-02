@@ -32,3 +32,8 @@ tests/data/*
 
 # Models (downloaded to ~/.insightface)
 models/
+
+# Solidity build output is regenerated from source; the deployment record
+# is not - it names a real on-chain address and transaction.
+build/*
+!build/deployment.json

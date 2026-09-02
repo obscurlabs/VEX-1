@@ -15,5 +15,15 @@ onnx==1.22.0
 # Phase 1 - live discovery
 requests==2.34.2
 
+# Phase 4 - blockchain
+web3==8.0.0
+py-solc-x==2.0.5
+
 # tests
 pytest==9.1.1
+# in-process EVM for contract tests. The [py-evm] extra pulls safe-pysha3,
+# which needs an MSVC toolchain on Windows; the pycryptodome keccak backend
+# avoids that.
+eth-tester==0.14.0b1
+py-evm==0.12.1b1
+eth-hash[pycryptodome]==0.8.0

@@ -5,10 +5,10 @@ search, candidate images are independently re-matched locally, and the
 resulting evidence bundle is fingerprinted and anchored on Polygon Amoy so its
 integrity can be re-verified later.
 
-> **Status: Phases 0-3 complete.** Local vision, live reverse-image discovery,
-> isolated candidate retrieval, independent face matching, and the evidence
-> bundle with a deterministic SHA-256 fingerprint are implemented and tested.
-> The blockchain anchor (Phase 4) is not built yet.
+> **Status: Phases 0-4 complete.** Local vision, live reverse-image discovery,
+> isolated candidate retrieval, independent face matching, the deterministic
+> evidence fingerprint, and on-chain anchoring to Polygon Amoy are implemented
+> and tested against the real network.
 
 ## Pipeline
 
@@ -229,6 +229,58 @@ Verification runs two independent checks, both required: every artifact's
 on-disk digest must match the manifest, and re-canonicalizing `manifest.json`
 must reproduce the recorded `evidence_sha256`. Exit 0 = `VERIFIED`, 1 =
 `FAILED`.
+
+## Blockchain anchoring (Phase 4)
+
+`contracts/IdentityAnchor.sol` — 975 bytes deployed, solc 0.8.26, optimizer on
+(200 runs), EVM `paris`.
+
+The chain does **no** face recognition, no search, no evidence processing. It
+stores two 32-byte values plus the provenance the chain gives for free:
+
+```solidity
+struct EvidenceRecord {
+    bytes32 evidenceHash;  // SHA-256 of the canonical manifest
+    address submitter;
+    uint64  timestamp;
+    uint64  blockNumber;
+}
+```
+
+Keyed by `keccak256(investigation_id)`. No images, no embeddings, no raw search
+results, no personal data.
+
+**Duplicate policy — rejected, both ways.** An investigation may be anchored
+exactly once (`InvestigationAlreadyAnchored`), and an evidence hash may be
+anchored exactly once (`EvidenceHashAlreadyAnchored`). A fingerprint can
+therefore never map to two conflicting records. Re-running an investigation
+needs a new investigation id, which is what a genuinely new observation is.
+`investigationForHash()` resolves a fingerprint back to its record.
+
+```bash
+python scripts/deploy.py                              # deploy, writes build/deployment.json
+python anchor.py evidence/TRACE-20260902-F53AF4       # anchor + read back + compare
+python anchor.py evidence/TRACE-20260902-F53AF4 --verify-only   # no transaction
+```
+
+`anchor.py` recomputes the fingerprint from the bundle on disk, refuses to
+anchor a bundle that does not verify locally, sends the transaction, waits for
+a real receipt, reads the hash back, and compares. `anchor.json` is written
+into the bundle but is **not** covered by the Phase 3 fingerprint — the anchor
+references the evidence, never the other way round.
+
+### Safety
+
+The private key is read from the environment, never logged, never returned,
+never written to an artifact; only the derived public address is printed.
+`WalletConfigError` messages deliberately omit the key. Chain id is asserted
+against 80002 before any write. Balance is checked before broadcasting.
+Receipt waiting is bounded (`TX_RECEIPT_TIMEOUT`, default 180 s) and a delayed
+confirmation is reported as delayed with its transaction hash — never as
+success, and never re-broadcast.
+
+Polygon is proof-of-authority, so `ExtraDataToPOAMiddleware` is required;
+without it every `get_block()` fails on the 105-byte `extraData`.
 
 ## Run
 

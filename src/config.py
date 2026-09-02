@@ -101,15 +101,40 @@ class RetrievalConfig:
 
 
 @dataclass(frozen=True)
+class ChainConfig:
+    """Polygon Amoy. Chain id is asserted before any write."""
+
+    # Polygon documents Amoy as chain id 80002. Never assume - verify.
+    expected_chain_id: int = _i("EXPECTED_CHAIN_ID", 80002)
+    network_name: str = _s("CHAIN_NETWORK_NAME", "Polygon Amoy")
+    # Bounded receipt waiting: public RPCs stall, and a hung wait is worse
+    # than an honest "confirmation delayed".
+    receipt_timeout: float = _f("TX_RECEIPT_TIMEOUT", 180.0)
+    poll_interval: float = _f("TX_POLL_INTERVAL", 2.0)
+    rpc_timeout: float = _f("RPC_TIMEOUT", 30.0)
+    # Refuse to broadcast below this; a failed send still costs time.
+    min_balance_wei: int = _i("MIN_BALANCE_WEI", 10_000_000_000_000_000)  # 0.01 POL
+    gas_buffer_percent: int = _i("GAS_BUFFER_PERCENT", 25)
+    explorer: str = _s("CHAIN_EXPLORER", "https://amoy.polygonscan.com")
+
+
+@dataclass(frozen=True)
 class Config:
     vision: VisionConfig = VisionConfig()
     match: MatchConfig = MatchConfig()
     search: SearchConfig = SearchConfig()
     retrieval: RetrievalConfig = RetrievalConfig()
+    chain: ChainConfig = ChainConfig()
     pipeline_version: str = _s("PIPELINE_VERSION", "1.0.0")
     serpapi_key: str = _s("SERPAPI_KEY")
     polygon_rpc_url: str = _s("POLYGON_RPC_URL")
     contract_address: str = _s("CONTRACT_ADDRESS")
+
+    @property
+    def private_key(self) -> str:
+        """Read on demand and never stored on the config object, so it cannot
+        be printed by an accidental repr() of CONFIG."""
+        return os.getenv("PRIVATE_KEY", "")
 
     @property
     def project_root(self) -> Path:

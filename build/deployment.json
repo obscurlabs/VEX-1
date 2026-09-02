@@ -1,0 +1,18 @@
+{
+  "contract": "IdentityAnchor",
+  "network": "Polygon Amoy",
+  "chain_id": 80002,
+  "address": "0x9463c096472c67Fe85E931361904CDB6A6546b2E",
+  "deployer": "0x5Bd62F6d99e3f91B6a7299490B2122c4Ac75087A",
+  "deployment_tx": "0x22f55661faede4483e3fd077d6124f4b3d0bff3be8619f453446b3b6df499e23",
+  "block_number": 46525685,
+  "block_hash": "063a0479741126f47f147a7641159e278099bc1497a56b35586ec61010b592d0",
+  "gas_used": 263942,
+  "effective_gas_price_wei": 91694592174,
+  "fee_wei": 24202054047589908,
+  "fee_pol": "0.024202054",
+  "solc_version": "0.8.26",
+  "source_sha256": "3ff1f2b4a5442f0847080323acc95d70cc3ca7554641b62ed8c1e0f12b998868",
+  "deployed_at": "2026-09-02T10:15:36+00:00",
+  "explorer": "https://amoy.polygonscan.com/address/0x9463c096472c67Fe85E931361904CDB6A6546b2E"
+}
