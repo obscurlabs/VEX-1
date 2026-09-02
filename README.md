@@ -5,10 +5,10 @@ search, candidate images are independently re-matched locally, and the
 resulting evidence bundle is fingerprinted and anchored on Polygon Amoy so its
 integrity can be re-verified later.
 
-> **Status: Phases 0-2 complete.** Local vision, live reverse-image discovery
-> with isolated candidate retrieval, and independent face matching with
-> ranking are implemented and tested. Evidence bundling, deterministic
-> hashing and the blockchain anchor are not built yet.
+> **Status: Phases 0-3 complete.** Local vision, live reverse-image discovery,
+> isolated candidate retrieval, independent face matching, and the evidence
+> bundle with a deterministic SHA-256 fingerprint are implemented and tested.
+> The blockchain anchor (Phase 4) is not built yet.
 
 ## Pipeline
 
@@ -165,6 +165,70 @@ whose bytes hash to the input's SHA-256 are flagged `identical_to_input` and
 reported as `[SAME FILE AS INPUT]`. That locates the source but is **not**
 independent corroboration, so the run also reports `best_independent`: the
 highest-scoring match that is a genuinely different file.
+
+## Evidence bundle (Phase 3)
+
+```text
+evidence/TRACE-YYYYMMDD-XXXXXX/
+├── input.jpg              the image as submitted
+├── source-image.jpg       the anchored candidate, saved verbatim
+├── search-request.json    provider, image_id, search_id, timestamp, live flag
+├── search-response.json   the raw provider response, BYTE-FOR-BYTE
+├── candidates.json        normalized candidates
+├── retrieval.json         per-candidate outcome, status, timing, sha256
+├── matching.json          per-face similarities, ranking, selection
+├── manifest.json          the canonical manifest (stored AS the hashed bytes)
+└── fingerprint.json       evidence_sha256 + algorithm + canonicalization spec
+```
+
+The bundle anchors the **best independent match** — the highest-scoring
+candidate that is not the input file rediscovered. If the only match is the
+input itself, that is bundled but flagged, not passed off as corroboration.
+
+### Canonicalization
+
+`manifest.json` is written as the exact bytes that were hashed, so there is no
+ambiguity about what the fingerprint covers.
+
+```text
+json;sort_keys=true;separators=(',',':');ensure_ascii=false;
+allow_nan=false;unicode=NFC;encoding=utf-8;floats=forbidden
+```
+
+**Floats are rejected outright.** `repr()` of a binary float is stable in
+CPython, but "the same number" is ambiguous across languages and serializers —
+0.9944 may be emitted as `0.9944`, `0.99440000000001` or `9.944e-1`. A
+fingerprint other tools must reproduce cannot depend on that. Every real value
+is quantized to a fixed-precision decimal **string** (`decimal_str`, 6 places
+for similarity, 4 for detection scores) before it enters the manifest, and
+`canonical_bytes()` raises on any raw float that slips through. Integers are
+exact and stay JSON numbers. Strings are NFC-normalized so composed and
+decomposed Unicode hash alike.
+
+### What the hash covers
+
+Every manifest field, **and** a SHA-256 of every other file in the bundle —
+so altering any artifact, binary included, changes the fingerprint.
+
+Deliberately **not** covered: face embeddings (biometric data is never
+written to disk or hashed), API keys, private keys, `.env` contents, absolute
+filesystem paths, and any wall-clock time describing the *process* rather than
+the evidence. `created_at`, `requested_at` and `retrieved_at` **are** covered —
+they state when the search ran and when the candidate was fetched, are written
+once, and are read back verbatim on verification, never regenerated.
+
+### Verify and tamper-test
+
+```bash
+python verify.py evidence/TRACE-20260902-F53AF4
+python verify.py evidence/TRACE-20260902-F53AF4 --show-manifest
+python scripts/tamper_test.py evidence/TRACE-20260902-F53AF4
+```
+
+Verification runs two independent checks, both required: every artifact's
+on-disk digest must match the manifest, and re-canonicalizing `manifest.json`
+must reproduce the recorded `evidence_sha256`. Exit 0 = `VERIFIED`, 1 =
+`FAILED`.
 
 ## Run
 

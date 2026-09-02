@@ -143,6 +143,7 @@ class GoogleLensProvider(SearchProvider):
 
         self._raise_for_api_status(r, "search")
 
+        raw_bytes = r.content
         try:
             raw = r.json()
         except ValueError as exc:
@@ -161,6 +162,7 @@ class GoogleLensProvider(SearchProvider):
             provider=self.name,
             live=True,
             raw=raw,
+            raw_bytes=raw_bytes,
             candidates=candidates,
             image_id=image_id,
             search_id=meta.get("id"),

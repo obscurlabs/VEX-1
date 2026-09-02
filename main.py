@@ -24,7 +24,14 @@ from src.discovery.google_lens import GoogleLensProvider
 from src.discovery.retrieval import CandidateRetriever
 from src.discovery import normalizer
 from src.matching import ranker
-from src.evidence.collector import ArtifactStore, new_investigation_id, utc_now_iso
+from src.evidence import hashing, manifest as manifest_mod
+from src.evidence.collector import (
+    ArtifactStore,
+    new_investigation_id,
+    utc_now_iso,
+    verify_bundle,
+    write_fingerprint,
+)
 from src.matching.ranker import CandidateMatcher
 from src.models import CandidateStatus, ImageStatus, SearchResult
 from src.pipeline import banner, die, fail, info, ok, stage, warn
@@ -42,7 +49,8 @@ def run_discovery_live(image_path: Path, store: ArtifactStore) -> SearchResult:
 
     result = provider.search(image_path)
 
-    store.write_json("search-response.json", result.raw)
+    # Byte-for-byte, not a re-serialisation of the parsed dict.
+    store.write_bytes("search-response.json", result.raw_bytes)
     store.write_json("search-request.json", {
         "provider": provider.name,
         "engine": "google_lens",
@@ -60,12 +68,14 @@ def run_discovery_diagnostic(path: Path) -> SearchResult:
     """Replay a previously saved response. Clearly labelled, never automatic."""
     if not path.exists():
         die(f"diagnostic mode needs a saved response; {path} does not exist")
-    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw_bytes = path.read_bytes()
+    raw = json.loads(raw_bytes.decode("utf-8"))
     candidates = normalizer.normalize(raw)
     return SearchResult(
         provider="google_lens",
         live=False,
         raw=raw,
+        raw_bytes=raw_bytes,
         candidates=candidates,
         image_id=(raw.get("search_parameters") or {}).get("image_id"),
         search_id=(raw.get("search_metadata") or {}).get("id"),
@@ -84,12 +94,13 @@ def main() -> int:
 
     image_path = Path(args.image)
     investigation_id = new_investigation_id()
+    started_at = utc_now_iso()
 
     banner("TRACE • FACE EVIDENCE")
     print(f"  investigation  {investigation_id}")
     print(f"  mode           {args.mode.upper()}"
           + ("" if args.mode == "live" else "   ** REPLAYING A SAVED RESPONSE **"))
-    print(f"  started        {utc_now_iso()}")
+    print(f"  started        {started_at}")
 
     store = ArtifactStore(investigation_id)
 
@@ -137,6 +148,7 @@ def main() -> int:
         fail(f"SEARCH FAILED - {type(exc).__name__}: {exc}")
         return 4
 
+    search_requested_at = utc_now_iso()
     if args.mode == "live":
         ok(f"image uploaded   image_id={result.image_id[:28]}...")
         ok(f"Google Lens queried  search_id={result.search_id}  ({result.elapsed_ms:.0f} ms)")
@@ -163,6 +175,7 @@ def main() -> int:
     selected = result.candidates[: args.max_candidates]
     stage("04", f"CANDIDATE RETRIEVAL  ({len(selected)} of {len(result.candidates)}, "
                 f"concurrency {CONFIG.retrieval.concurrency})")
+    retrieved_at = utc_now_iso()
     retriever = CandidateRetriever(logger=lambda line: print("  " + line))
     fetched = retriever.fetch_all(selected)
 
@@ -258,11 +271,109 @@ def main() -> int:
                 info(f"face    #{independent.best_face_index} of "
                      f"{independent.faces_detected} detected")
 
+    # -- 07 evidence -------------------------------------------------
+    stage("07", "EVIDENCE BUNDLE")
+
+    anchor = independent or selected
+    if anchor is None:
+        warn("no candidate matched; no evidence bundle to build")
+        print(f"\nartifacts: {store.relative(store.root)}")
+        return 0
+    if independent is None:
+        warn("the only match is the input file itself; bundling it, but it is "
+             "not independent corroboration")
+
+    if anchor.retrieval is not None and anchor.retrieval.content:
+        store.write_bytes("source-image.jpg", anchor.retrieval.content)
+        ok(f"candidate image saved verbatim ({len(anchor.retrieval.content)} bytes)")
+
+    digests = {}
+    for name in manifest_mod.ARTIFACT_FILES:
+        path = store.root / name
+        if path.exists():
+            digests[name] = {"sha256": hashing.sha256_file(path),
+                             "bytes": path.stat().st_size}
+
+    input_face = {
+        "bbox": list(face.bbox),
+        "det_score": hashing.decimal_str(face.det_score, hashing.SCORE_PLACES),
+        "width": face.width,
+        "height": face.height,
+        "faces_detected": vision.faces_detected,
+    }
+    retrieval_meta = {
+        "http_status": anchor.retrieval.http_status if anchor.retrieval else None,
+        "content_type": anchor.retrieval.content_type if anchor.retrieval else None,
+        "content_sha256": anchor.retrieval.content_sha256 if anchor.retrieval else None,
+        "bytes_downloaded": anchor.retrieval.bytes_downloaded if anchor.retrieval else 0,
+        "retrieved_at": retrieved_at,
+        "candidates_retrieved": len(retrieved),
+        "candidates_attempted": len(fetched),
+    }
+    model_meta = {
+        "model_pack": mi["pack"],
+        "detector": mi["detector"],
+        "detector_file": mi["detector_file"],
+        "recognizer": "ArcFace",
+        "recognizer_file": mi["recognizer_file"],
+        "embedding_dim": emb.dim,
+        "providers": mi["providers"],
+    }
+
+    evidence_manifest = manifest_mod.build(
+        investigation_id=investigation_id,
+        created_at=started_at,
+        pipeline_version=CONFIG.pipeline_version,
+        input_sha256=input_sha256,
+        input_bytes=image_path.stat().st_size,
+        input_size=(img.shape[1], img.shape[0]),
+        input_face=input_face,
+        search=result,
+        search_requested_at=search_requested_at,
+        normalized_candidate_count=len(result.candidates),
+        evaluated_count=len(fetched),
+        selected=selected,
+        independent=independent,
+        retrieval=retrieval_meta,
+        model=model_meta,
+        threshold=CONFIG.match.threshold,
+        artifact_digests=digests,
+    )
+
+    digest, manifest_path, _ = write_fingerprint(store, evidence_manifest)
+    ok(f"canonical manifest  {manifest_path.stat().st_size} bytes")
+    ok(f"SHA-256  {digest}")
+    info(f"covers {len(digests)} artifacts + every manifest field")
+    info(f"anchored candidate: {anchor.candidate.source_domain} "
+         f"(similarity {anchor.best_similarity:.6f})")
+
+    # Determinism is asserted on the real manifest, on every run.
+    repeats = {hashing.fingerprint(evidence_manifest)[0] for _ in range(5)}
+    if len(repeats) != 1 or repeats.pop() != digest:
+        fail("CANONICALIZATION IS NOT DETERMINISTIC")
+        return 5
+    ok("canonicalization deterministic (5x identical)")
+
+    # -- 08 verification ---------------------------------------------
+    stage("08", "VERIFICATION")
+    check = verify_bundle(store.root)
+    if not check.verified:
+        fail("EVIDENCE INTEGRITY FAILED")
+        for problem in check.problems:
+            info(problem)
+        return 6
+    ok(f"{len(check.checked)} artifact digests match what is on disk")
+    ok("recomputed manifest hash matches the recorded fingerprint")
+    print()
+    print("  ╔" + "═" * 44 + "╗")
+    print("  ║" + "✓ EVIDENCE INTEGRITY VERIFIED".center(44) + "║")
+    print("  ╚" + "═" * 44 + "╝")
+
     print(f"\nartifacts: {store.relative(store.root)}")
     for f in sorted(store.root.iterdir()):
         print(f"  {f.name}  ({f.stat().st_size} bytes)")
 
-    print("\n  Phase 3 (evidence bundle + SHA-256) is not wired yet.")
+    print("\n  Phase 4 (Polygon Amoy anchoring) is not wired yet.")
     return 0
 
 

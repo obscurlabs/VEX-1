@@ -210,6 +210,9 @@ class CandidateResult:
     elapsed_ms: float = 0.0
     image_size: tuple[int, int] | None = None
     image: Any = field(default=None, repr=False, compare=False)
+    # The exact bytes downloaded, kept so the evidence bundle can store the
+    # candidate image verbatim rather than a re-encoded copy.
+    content: bytes = field(default=b"", repr=False, compare=False)
 
     @property
     def ok(self) -> bool:
@@ -236,6 +239,10 @@ class SearchResult:
     provider: str
     live: bool
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
+    # The provider's response exactly as it arrived on the wire. Evidence
+    # preserves these bytes verbatim; re-serialising the parsed dict would
+    # silently change key order, spacing and number formatting.
+    raw_bytes: bytes = field(default=b"", repr=False)
     candidates: list[SearchCandidate] = field(default_factory=list)
     image_id: str | None = None
     search_id: str | None = None
@@ -287,6 +294,9 @@ class CandidateMatch:
     # source file is a legitimate discovery result, but it is NOT independent
     # corroboration, so it is flagged rather than silently ranked as a match.
     identical_to_input: bool = False
+    # Retrieval facts carried forward so the evidence manifest can describe
+    # the candidate without re-fetching it.
+    retrieval: "CandidateResult | None" = field(default=None, repr=False, compare=False)
 
     @property
     def is_match(self) -> bool:

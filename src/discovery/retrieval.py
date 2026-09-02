@@ -104,6 +104,7 @@ class CandidateRetriever:
 
         result.image = img
         result.image_size = (img.shape[1], img.shape[0])
+        result.content = body
         result.status = CandidateStatus.RETRIEVED
         return result
 

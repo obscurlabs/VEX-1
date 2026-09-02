@@ -69,6 +69,7 @@ class CandidateMatcher:
             threshold=self.threshold,
             image_size=result.image_size,
             detail=result.detail,
+            retrieval=result,
             identical_to_input=bool(
                 self.input_sha256
                 and result.content_sha256
