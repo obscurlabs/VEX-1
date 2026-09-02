@@ -5,10 +5,11 @@ search, candidate images are independently re-matched locally, and the
 resulting evidence bundle is fingerprinted and anchored on Polygon Amoy so its
 integrity can be re-verified later.
 
-> **Status: Phases 0-4 complete.** Local vision, live reverse-image discovery,
-> isolated candidate retrieval, independent face matching, the deterministic
-> evidence fingerprint, and on-chain anchoring to Polygon Amoy are implemented
-> and tested against the real network.
+> **Status: Phases 0-5 complete.** The full pipeline runs end to end: local
+> vision, live reverse-image discovery, isolated candidate retrieval,
+> independent face matching, a deterministic evidence fingerprint, on-chain
+> anchoring to Polygon Amoy, and standalone verification of a bundle against
+> its anchor.
 
 ## Pipeline
 
@@ -281,6 +282,67 @@ success, and never re-broadcast.
 
 Polygon is proof-of-authority, so `ExtraDataToPOAMiddleware` is required;
 without it every `get_block()` fails on the 105-byte `extraData`.
+
+## End-to-end verification (Phase 5)
+
+```bash
+python verify_chain.py evidence/TRACE-20260902-F53AF4
+python verify_chain.py <bundle> --contract 0x...   # explicit contract
+python verify_chain.py <bundle> --json             # machine-readable
+```
+
+Read-only: **no private key is required**. Anyone holding a bundle can check
+it against the chain.
+
+### Data path
+
+```text
+artifact files          -> SHA-256 each, compared to manifest.artifacts
+manifest.json           -> canonical bytes -> SHA-256  = LOCAL FINGERPRINT
+investigation_id        -> keccak256                   = on-chain record key
+IdentityAnchor.getEvidence(key)                        = ON-CHAIN FINGERPRINT
+local == on-chain                                      -> VERIFIED
+```
+
+`fingerprint.json` is **not** the source of truth. The fingerprint is always
+recomputed from the manifest on disk; the cached value is shown only as a
+cross-check, because anyone who edited the manifest would have edited that
+file too. A deliberately falsified `fingerprint.json` does not change the
+verdict — there is a test for exactly that.
+
+### Two detection layers
+
+Tampering is caught by whichever layer it touches:
+
+| what changed | manifest SHA-256 | caught by | status |
+|---|---|---|---|
+| a field inside the manifest | **changes** | hash vs chain | `HASH_MISMATCH` |
+| a covered artifact | unchanged | per-artifact digest | `ARTIFACT_MODIFIED` |
+| a covered artifact deleted | unchanged | per-artifact digest | `ARTIFACT_MISSING` |
+| artifact **and** its manifest digest re-signed | **changes** | hash vs chain | `HASH_MISMATCH` |
+
+The last row is the interesting one: restoring local self-consistency does not
+help, because the manifest hash moved and the chain still holds the original.
+
+An artifact edit leaving the manifest hash unchanged is correct, not a gap —
+the manifest carries the digests, so the digest layer is what must catch it.
+
+### Failure states
+
+`BUNDLE_NOT_FOUND` · `MANIFEST_MISSING` · `MANIFEST_MALFORMED` ·
+`INVESTIGATION_ID_MISSING` · `ARTIFACT_MISSING` · `ARTIFACT_MODIFIED` ·
+`CONTRACT_NOT_CONFIGURED` · `CONTRACT_INVALID` · `WRONG_CHAIN` ·
+`RPC_FAILURE` · `NOT_ANCHORED` · `HASH_MISMATCH`
+
+### Tamper demonstration
+
+```bash
+python scripts/tamper_chain_demo.py evidence/TRACE-20260902-F53AF4
+```
+
+Copies the bundle into a `TemporaryDirectory`, applies six mutations, compares
+each recomputed fingerprint against the live on-chain value, then re-verifies
+the untouched original. The real bundle is never modified.
 
 ## Run
 

@@ -123,7 +123,11 @@ class AnchorClient:
         private_key: str | None = None,
         logger: Callable[[str], None] | None = None,
         web3: Web3 | None = None,
+        read_only: bool = False,
     ):
+        # Verification is a read-only operation: anyone holding a bundle must
+        # be able to check it against the chain without the submitter's key.
+        self.read_only = read_only
         self.cfg = CONFIG.chain
         self.log = logger or (lambda *_a, **_k: None)
         self.rpc_url = rpc_url if rpc_url is not None else CONFIG.polygon_rpc_url
@@ -141,8 +145,11 @@ class AnchorClient:
             # without this.
             self.w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 
-        key = private_key if private_key is not None else CONFIG.private_key
-        self.account = self._load_account(key)
+        if read_only:
+            self.account = None
+        else:
+            key = private_key if private_key is not None else CONFIG.private_key
+            self.account = self._load_account(key)
         self.artifact = compile_contract()
 
     # -- wallet ---------------------------------------------------------
@@ -171,9 +178,13 @@ class AnchorClient:
             raise WalletConfigError(f"PRIVATE_KEY is not a valid key ({type(exc).__name__})") from None
 
     @property
-    def address(self) -> str:
-        """The derived public address. Safe to print."""
-        return self.account.address
+    def address(self) -> str | None:
+        """The derived public address. Safe to print. None when read-only."""
+        return self.account.address if self.account else None
+
+    def _require_signer(self) -> None:
+        if self.account is None:
+            raise WalletConfigError("this client is read-only; no signing key is loaded")
 
     # -- connection -----------------------------------------------------
 
@@ -201,6 +212,7 @@ class AnchorClient:
         return chain_id
 
     def balance_wei(self) -> int:
+        self._require_signer()
         try:
             return self.w3.eth.get_balance(self.address)
         except Exception as exc:
@@ -237,6 +249,7 @@ class AnchorClient:
         return {"maxFeePerGas": int(max_fee), "maxPriorityFeePerGas": int(priority)}
 
     def _build_common(self) -> dict[str, Any]:
+        self._require_signer()
         return {
             "from": self.address,
             "nonce": self.w3.eth.get_transaction_count(self.address),
@@ -248,6 +261,7 @@ class AnchorClient:
 
     def _send(self, tx: dict[str, Any]) -> str:
         """Sign and broadcast. Returns the tx hash immediately after broadcast."""
+        self._require_signer()
         signed = self.account.sign_transaction(tx)
         raw = getattr(signed, "raw_transaction", None) or signed.rawTransaction
         try:
@@ -377,3 +391,8 @@ class AnchorClient:
         return bool(
             contract.functions.isAnchored(investigation_key(investigation_id)).call()
         )
+
+
+def read_only_client(rpc_url: str | None = None, logger=None, web3=None) -> AnchorClient:
+    """A client that can read the chain but holds no signing key."""
+    return AnchorClient(rpc_url=rpc_url, logger=logger, web3=web3, read_only=True)
