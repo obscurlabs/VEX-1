@@ -1,0 +1,19 @@
+# Phase 0 - local vision. Pinned to what was actually installed and tested.
+insightface==1.0.1
+onnxruntime==1.29.0
+opencv-python==4.12.0.88
+numpy==2.2.6
+pillow==12.3.0
+python-dotenv==1.2.3
+
+# insightface pulls these; pinned because scikit-image 0.26 already emits a
+# FutureWarning from insightface's face_align and 2.2 will break it outright.
+scikit-image==0.26.0
+scipy==1.18.1
+onnx==1.22.0
+
+# Phase 1 - live discovery
+requests==2.34.2
+
+# tests
+pytest==9.1.1

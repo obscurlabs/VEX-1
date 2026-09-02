@@ -1,0 +1,28 @@
+# Environment / secrets
+.env
+*.pem
+*.key
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Runtime artefacts
+evidence/*
+!evidence/.gitkeep
+cache/*
+!cache/.gitkeep
+inputs/*
+!inputs/.gitkeep
+
+# Test corpus: the images are redownloadable, the manifest that names them
+# is not - it records which candidates a human actually confirmed.
+tests/data/*
+!tests/data/.gitkeep
+!tests/data/confirmed.json
+
+# Models (downloaded to ~/.insightface)
+models/
