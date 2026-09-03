@@ -19,8 +19,12 @@ requests==2.34.2
 web3==8.0.0
 py-solc-x==2.0.5
 
+# Phase 7 - desktop GUI (presentation layer only)
+PySide6==6.11.2
+
 # tests
 pytest==9.1.1
+pytest-qt==4.5.0
 # in-process EVM for contract tests. The [py-evm] extra pulls safe-pysha3,
 # which needs an MSVC toolchain on Windows; the pycryptodome keccak backend
 # avoids that.

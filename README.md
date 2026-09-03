@@ -381,6 +381,17 @@ Flags:
 | `--no-retrieval` | stop after discovery |
 | `--max-candidates N` | how many discovered candidates to retrieve |
 
+### Desktop GUI
+
+```bash
+python -m gui.app
+```
+
+A thin PySide6 shell over the same pipeline. It calls `main.run()` on a worker
+thread and renders the events the reporter seam delivers — it contains no
+pipeline logic, parses no stdout, and shows no value the pipeline did not
+produce. The CLI remains the primary interface.
+
 ### Before the demo
 
 ```bash
