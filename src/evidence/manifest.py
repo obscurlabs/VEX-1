@@ -21,11 +21,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..models import CandidateMatch, SearchResult
+from ..models import CandidateMatch, MatchCensus, MatchGroup, SearchResult
 from . import hashing
 
 SCHEMA = "hhgoa-task3/evidence-manifest"
-SCHEMA_VERSION = "1.0.0"
+# 1.1.0 adds matching.ranked_matches, plus content_sha256 and retrieval_status
+# on every match record. Manifests of either version verify against their own
+# recorded fingerprint; the version states which shape was hashed.
+SCHEMA_VERSION = "1.1.0"
 
 # Files covered by the manifest's artifact digests, in a fixed order that
 # never depends on directory listing order.
@@ -91,8 +94,33 @@ def _match_record(match: CandidateMatch, role: str,
         ),
         "image_size": list(match.image_size) if match.image_size else None,
     }
+
+    # Retrieval facts, so a reader can check what was actually downloaded
+    # without re-fetching a URL that may since have changed.
+    retrieval = match.retrieval
+    record["retrieval_status"] = (
+        retrieval.status.value if retrieval is not None else None)
+    record["content_sha256"] = (
+        retrieval.content_sha256 if retrieval is not None else None)
+    record["content_type"] = (
+        retrieval.content_type if retrieval is not None else None)
+    record["bytes_downloaded"] = (
+        retrieval.bytes_downloaded if retrieval is not None else None)
+
     if image_file:
         record["image_file"] = image_file
+    return record
+
+
+def _group_record(group: MatchGroup, rank_position: int) -> dict[str, Any]:
+    """One independent source: its strongest match, plus what folded into it."""
+    record = _match_record(group.representative, "independent_match")
+    record["rank"] = rank_position
+    record["group_size"] = group.size
+    record["duplicates"] = [
+        {**_match_record(m, "duplicate"), "duplicate_reason": reason}
+        for m, reason in group.duplicates
+    ]
     return record
 
 
@@ -111,6 +139,8 @@ def build(
     evaluated_count: int,
     selected: CandidateMatch | None,
     independent: CandidateMatch | None,
+    ranked: list[MatchGroup] | None = None,
+    census: MatchCensus | None = None,
     retrieval: dict[str, Any],
     model: dict[str, str],
     threshold: float,
@@ -160,6 +190,12 @@ def build(
                 _match_record(independent, "best_independent_match", "source-image.jpg")
                 if independent else None
             ),
+            # The full ranked set. selected_match and best_independent_match
+            # above are retained unchanged for readers that only want one.
+            "ranked_matches": [
+                _group_record(group, i) for i, group in enumerate(ranked or [], start=1)
+            ],
+            "census": census.to_dict() if census is not None else None,
         },
 
         "retrieval": retrieval,

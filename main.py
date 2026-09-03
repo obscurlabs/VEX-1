@@ -84,6 +84,10 @@ from src.vision.quality import load_image
 
 TITLE = "HH GOA 2026 · FACE EVIDENCE PIPELINE"
 
+#: How many independent sources the default output lists before the summary.
+#: The full ranked set is always written to matching.json and the manifest.
+TOP_MATCHES = 5
+
 
 # ---------------------------------------------------------------- discovery
 
@@ -259,16 +263,21 @@ def run(args: argparse.Namespace) -> int:
         match_tally[m.status.value] = match_tally.get(m.status.value, 0) + 1
 
     scored = [m for m in matches if m.best_similarity is not None]
-    ok(f"{len(scored)} candidates embedded and scored")
+    ok(f"{len(scored)} candidates face-matched")
     if dist.get("n"):
         info(f"similarity  min {dist['min']:.4f}  median {dist['median']:.4f}  "
              f"max {dist['max']:.4f}")
 
     selected_match = ranker.best_match(matches)
     independent = ranker.best_independent_match(matches)
+    ranked_groups = ranker.independent_matches(matches)
+    census = ranker.census(matches, discovered=len(result.candidates),
+                           evaluated=len(fetched))
     store.write_json("matching.json", {
         "threshold": CONFIG.match.threshold,
         "input_sha256": input_sha256,
+        "census": census.to_dict(),
+        "ranked_matches": [g.to_dict() for g in ranked_groups],
         "target_image": str(image_path).replace("\\", "/"),
         "detector": mi["detector"],
         "face_model": mi["recognizer_file"],
@@ -283,6 +292,28 @@ def run(args: argparse.Namespace) -> int:
         info("the threshold is NOT lowered to force a result")
         verdict("NO MATCH FOUND", good=False)
         return EXIT_NO_MATCH
+
+    info(f"{census.discovered} discovered → {census.evaluated} evaluated → "
+         f"{census.retrieved} retrieved → {census.face_matched} face-matched → "
+         f"{census.qualifying} qualifying → {census.independent} independent")
+
+    shown = ranked_groups[:TOP_MATCHES]
+    if shown:
+        info("")
+        info(f"top independent sources (cosine similarity, threshold "
+             f"{CONFIG.match.threshold}):")
+        for position, group in enumerate(shown, start=1):
+            rep = group.representative
+            extra = (f"  (+{len(group.duplicates)} duplicate"
+                     f"{'s' if len(group.duplicates) != 1 else ''})"
+                     if group.duplicates else "")
+            info(f"  #{position}  {rep.best_similarity:.4f}  "
+                 f"{rep.candidate.source_domain:<28} {rep.status.value}{extra}")
+        remaining = len(ranked_groups) - len(shown)
+        if remaining > 0:
+            info(f"  … {remaining} further independent source"
+                 f"{'s' if remaining != 1 else ''} in matching.json")
+        info("")
 
     if independent is not None:
         ok("independent match found")
@@ -339,6 +370,8 @@ def run(args: argparse.Namespace) -> int:
         evaluated_count=len(fetched),
         selected=selected_match,
         independent=independent,
+        ranked=ranked_groups,
+        census=census,
         retrieval={
             "http_status": anchor_match.retrieval.http_status if anchor_match.retrieval else None,
             "content_type": anchor_match.retrieval.content_type if anchor_match.retrieval else None,

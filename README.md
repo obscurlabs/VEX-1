@@ -167,6 +167,41 @@ Ranking uses measured identity similarity only — never URL, domain or search
 position. The threshold comes from `FACE_MATCH_THRESHOLD` and is **never
 lowered at runtime to force a match**; when nothing clears it the run says so.
 
+### The ranked set
+
+One search yields many candidates, and collapsing them to a single answer
+throws away corroboration. The pipeline keeps the whole ranked set:
+
+```text
+discovered     normalized candidates from the provider response
+evaluated      candidates retrieval was attempted for
+retrieved      images downloaded and decoded
+face-matched   a face was embedded and scored against the target
+qualifying     scored at or above the configured threshold
+independent    qualifying, minus the input file rediscovered, and one
+               representative per distinct source
+```
+
+Google Lens routinely returns several URLs backed by one source — three
+thumbnail sizes of a video, a page listed twice under two image URLs.
+Presenting those as separate corroboration would overstate how many
+independent sources were found, so they are **grouped** behind the
+highest-scoring member and the reason is recorded (`identical image bytes`,
+`same page`, `same source domain`). Nothing is discarded: every folded match
+stays in the group's `duplicates`, in `matching.json` and in the manifest.
+
+Grouping is by exact domain string, so subdomains stay separate
+(`en.wikipedia.org` and `pap.wikipedia.org` do not merge). Collapsing those
+correctly needs a public-suffix list, which is not worth the dependency.
+
+The default CLI lists the top 5 independent sources, then the selected match.
+`selected_match` and `best_independent_match` keep their existing meanings —
+`best_independent_match` is the same object as the first entry of the ranked
+set, so nothing that read the old fields breaks.
+
+Anchoring is unchanged: **one canonical fingerprint per investigation**,
+covering the whole ranked set, not one transaction per match.
+
 ### Re-finding the input
 
 A reverse image search usually rediscovers the input file itself. Candidates

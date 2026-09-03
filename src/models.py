@@ -324,3 +324,64 @@ class CandidateMatch:
             "detail": self.detail,
             "elapsed_ms": round(self.elapsed_ms, 1),
         }
+
+
+@dataclass
+class MatchGroup:
+    """One source, and the duplicate evidence that collapsed into it.
+
+    Google Lens routinely returns several URLs backed by the same underlying
+    source - three thumbnail sizes of one video, a page listed twice under two
+    image URLs. Presenting those as separate corroboration would overstate how
+    many independent sources were found, so they are grouped behind the
+    highest-scoring member rather than discarded.
+    """
+
+    representative: "CandidateMatch"
+    duplicates: list[tuple["CandidateMatch", str]] = field(default_factory=list)
+    key: str = ""
+
+    @property
+    def size(self) -> int:
+        return 1 + len(self.duplicates)
+
+    @property
+    def similarity(self) -> float | None:
+        return self.representative.best_similarity
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "key": self.key,
+            "size": self.size,
+            "representative": self.representative.to_dict(),
+            "duplicates": [
+                {**m.to_dict(), "duplicate_reason": reason}
+                for m, reason in self.duplicates
+            ],
+        }
+
+
+@dataclass
+class MatchCensus:
+    """How many candidates survived each stage of the funnel.
+
+    Every number is a count of real candidates, named so the stages cannot be
+    confused with one another.
+    """
+
+    discovered: int = 0        # normalized from the provider response
+    evaluated: int = 0         # retrieval was attempted
+    retrieved: int = 0         # downloaded and decoded
+    face_matched: int = 0      # a face was embedded and scored
+    qualifying: int = 0        # cleared the similarity threshold
+    independent: int = 0       # distinct sources, excluding the input itself
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "discovered": self.discovered,
+            "evaluated": self.evaluated,
+            "retrieved": self.retrieved,
+            "face_matched": self.face_matched,
+            "qualifying": self.qualifying,
+            "independent": self.independent,
+        }

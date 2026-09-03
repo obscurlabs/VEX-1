@@ -37,6 +37,8 @@ from ..models import (
     CandidateStatus,
     FaceEmbedding,
     FaceMatch,
+    MatchCensus,
+    MatchGroup,
 )
 from ..vision.embedder import ArcFaceEmbedder
 
@@ -242,3 +244,110 @@ def format_line(index: int, m: CandidateMatch) -> str:
     if m.identical_to_input:
         detail += "  [SAME FILE AS INPUT]"
     return f"{head} -> {m.status.value:<20} {detail}"
+
+
+# -- the ranked set ----------------------------------------------------
+#
+# Vocabulary, used consistently everywhere this data surfaces:
+#
+#   discovered    normalized candidates from the provider response
+#   evaluated     candidates retrieval was attempted for
+#   retrieved     images downloaded and decoded
+#   face-matched  a face was embedded and scored against the target
+#   qualifying    scored at or above the configured threshold
+#   independent   qualifying, excluding the input file rediscovered, and
+#                 one representative per distinct source
+
+
+def qualifying(matches: Iterable[CandidateMatch]) -> list[CandidateMatch]:
+    """Every candidate that cleared the threshold, ranked by similarity."""
+    return rank([m for m in matches if m.is_match])
+
+
+def _content_hash(match: CandidateMatch) -> str | None:
+    retrieval = match.retrieval
+    return retrieval.content_sha256 if retrieval is not None else None
+
+
+def _duplicate_reason(representative: CandidateMatch, other: CandidateMatch) -> str:
+    """Why one match was folded behind another. Most specific reason wins."""
+    rep_hash, other_hash = _content_hash(representative), _content_hash(other)
+    if rep_hash and other_hash and rep_hash == other_hash:
+        return "identical image bytes"
+    if representative.candidate.url == other.candidate.url:
+        return "same page"
+    return "same source domain"
+
+
+def _group_key(match: CandidateMatch) -> str:
+    """What counts as one source.
+
+    The domain is the grouping unit: several URLs on one site are one
+    publisher, not several corroborating sources. Falls back to the content
+    hash and then the URL when a candidate carries no domain.
+
+    Known limitation: this is an exact-string comparison, so subdomains are
+    separate sources (en.wikipedia.org and pap.wikipedia.org do not group).
+    Collapsing those correctly needs a public-suffix list, which is not worth
+    the dependency here.
+    """
+    domain = (match.candidate.source_domain or "").strip().lower()
+    if domain:
+        return f"domain:{domain}"
+    digest = _content_hash(match)
+    if digest:
+        return f"content:{digest}"
+    return f"url:{match.candidate.url}"
+
+
+def group_by_source(matches: Iterable[CandidateMatch]) -> list[MatchGroup]:
+    """Collapse duplicate evidence, keeping the strongest member in front.
+
+    Nothing is discarded: every folded match stays reachable through the
+    group's ``duplicates``.
+    """
+    groups: dict[str, MatchGroup] = {}
+    for match in rank(list(matches)):
+        key = _group_key(match)
+        existing = groups.get(key)
+        if existing is None:
+            groups[key] = MatchGroup(representative=match, key=key)
+        else:
+            existing.duplicates.append(
+                (match, _duplicate_reason(existing.representative, match)))
+    # rank() already ordered the input, so representatives are in order.
+    return sorted(
+        groups.values(),
+        key=lambda g: (-(g.similarity or float("-inf")),
+                       g.representative.candidate.position),
+    )
+
+
+def independent_matches(matches: Iterable[CandidateMatch]) -> list[MatchGroup]:
+    """Distinct qualifying sources, strongest first.
+
+    "Independent" carries both senses the pipeline cares about: not the input
+    file rediscovered, and not another URL for a source already counted.
+    """
+    passing = [m for m in qualifying(matches) if not m.identical_to_input]
+    return group_by_source(passing)
+
+
+def top_independent(matches: Iterable[CandidateMatch],
+                    limit: int = 5) -> list[MatchGroup]:
+    """The strongest few distinct sources, for a summary that stays readable."""
+    return independent_matches(matches)[:limit]
+
+
+def census(matches: Iterable[CandidateMatch],
+           discovered: int = 0, evaluated: int = 0) -> MatchCensus:
+    """Count what survived each stage. Every number is real."""
+    items = list(matches)
+    return MatchCensus(
+        discovered=discovered,
+        evaluated=evaluated or len(items),
+        retrieved=sum(1 for m in items if m.retrieval is not None and m.retrieval.ok),
+        face_matched=sum(1 for m in items if m.best_similarity is not None),
+        qualifying=sum(1 for m in items if m.is_match),
+        independent=len(independent_matches(items)),
+    )
