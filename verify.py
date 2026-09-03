@@ -19,6 +19,12 @@ import json
 import sys
 from pathlib import Path
 
+# Fail with a readable message, not an import traceback, when the entry
+# point is run with an interpreter that lacks the dependencies.
+from src.bootstrap import require_dependencies
+
+require_dependencies()
+
 from src.evidence import hashing
 from src.evidence.collector import MANIFEST_FILE, verify_bundle
 

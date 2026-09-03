@@ -19,6 +19,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.bootstrap import require_dependencies  # noqa: E402
+
+require_dependencies()
+
 from src.blockchain.client import (  # noqa: E402
     AnchorClient,
     ChainError,

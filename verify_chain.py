@@ -22,6 +22,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Fail with a readable message, not an import traceback, when the entry
+# point is run with an interpreter that lacks the dependencies.
+from src.bootstrap import require_dependencies
+
+require_dependencies()
+
 from src.blockchain.verifier import (
     VerificationStatus,
     investigation_record_key,

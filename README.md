@@ -5,11 +5,8 @@ search, candidate images are independently re-matched locally, and the
 resulting evidence bundle is fingerprinted and anchored on Polygon Amoy so its
 integrity can be re-verified later.
 
-> **Status: Phases 0-5 complete.** The full pipeline runs end to end: local
-> vision, live reverse-image discovery, isolated candidate retrieval,
-> independent face matching, a deterministic evidence fingerprint, on-chain
-> anchoring to Polygon Amoy, and standalone verification of a bundle against
-> its anchor.
+> **Status: Phases 0-6 complete.** One command runs the whole pipeline live,
+> from face scan to on-chain verification, in about 45 seconds.
 
 ## Pipeline
 
@@ -39,6 +36,17 @@ VIRTUAL_ENV=.venv uv pip install -r requirements.txt
 cp .env.example .env
 ```
 
+**Activate the venv before running anything:**
+
+```text
+Windows:        .venv\Scripts\activate
+macOS / Linux:  source .venv/bin/activate
+```
+
+Every command below assumes it is active. Without it, a system `python` will
+not have the dependencies — the entry points detect that and print which
+interpreter is running and how to fix it, rather than an import traceback.
+
 Python 3.12 rather than 3.14: it is the version the InsightFace/ONNX stack is
 most reliably packaged for. `insightface==1.0.1` ships a pure-Python wheel
 (`py3-none-any`), so no MSVC toolchain is needed on Windows — earlier
@@ -67,7 +75,7 @@ landmark models in the pack are skipped since nothing here uses them.
 
 ```bash
 python main.py --image inputs/target.jpg --mode live
-python main.py --image inputs/target.jpg --mode diagnostic   # replay a saved response
+python main.py --image inputs/target.jpg --mode diagnostic
 ```
 
 The documented local-image workflow, verified against the live API:
@@ -344,18 +352,84 @@ Copies the bundle into a `TemporaryDirectory`, applies six mutations, compares
 each recomputed fingerprint against the live on-chain value, then re-verifies
 the untouched original. The real bundle is never modified.
 
-## Run
+## Commands
+
+### Everything, in one command
 
 ```bash
-# bundled multi-face demo
-.venv/Scripts/python.exe phase0.py
-
-# a specific image
-.venv/Scripts/python.exe phase0.py --image inputs/target.jpg
-
-# compare two images
-.venv/Scripts/python.exe phase0.py --image a.jpg --compare b.jpg
+python main.py --image inputs/demo-target.jpg --mode live
 ```
+
+```text
+[01] FACE SCAN            detect + ArcFace embedding (model loads once)
+[02] WEB DISCOVERY        real SerpApi -> Google Lens
+[03] CANDIDATE RETRIEVAL  bounded concurrency, isolated failures
+[04] FACE MATCHING        independent re-matching against every candidate
+[05] EVIDENCE             bundle + deterministic SHA-256
+[06] BLOCKCHAIN           anchor on Polygon Amoy
+[07] VERIFICATION         read back, compare, VERIFIED
+```
+
+Flags:
+
+| flag | effect |
+|---|---|
+| `--mode live` / `--mode diagnostic` | live never reads a cached response |
+| `--verbose` | per-candidate detail instead of aggregate counts |
+| `--debug` | let unexpected exceptions surface with a traceback |
+| `--no-chain` | stop after the evidence fingerprint (no gas) |
+| `--no-retrieval` | stop after discovery |
+| `--max-candidates N` | how many discovered candidates to retrieve |
+
+### Before the demo
+
+```bash
+python preflight.py            # checks everything; sends no search, no transaction
+python preflight.py --offline  # skip the network checks
+```
+
+### Independent verification
+
+```bash
+python verify.py <bundle>                        # local integrity only
+python verify_chain.py <bundle>                  # local + on-chain (no key needed)
+python verify_chain.py <bundle> --json           # machine-readable
+python scripts/tamper_chain_demo.py <bundle>     # tamper demonstration
+python scripts/tamper_test.py <bundle>           # local-only tamper test
+```
+
+### Deployment (already done; here for completeness)
+
+```bash
+python scripts/deploy.py                         # deploy IdentityAnchor
+python anchor.py <bundle>                        # anchor an existing bundle
+```
+
+### Exit codes
+
+| code | meaning |
+|---|---|
+| 0 | success |
+| 1 | unreadable image / no face |
+| 2 | SerpAPI authentication failed |
+| 3 | SerpAPI rate limit or quota |
+| 4 | discovery failed |
+| 5 | ran fine, nothing matched |
+| 6 | evidence or fingerprint problem |
+| 7 | RPC, wallet, or transaction failure |
+| 8 | hash mismatch |
+| 130 | interrupted |
+
+A normal run never prints a Python traceback. Unexpected exceptions are caught
+at the CLI boundary and summarised; `--debug` re-raises them.
+
+### Duplicate anchoring
+
+The contract rejects duplicates by design, so the CLI checks `isAnchored()`
+before spending gas. A normal run generates a fresh investigation id and
+anchors once. Re-running `anchor.py` on an already-anchored bundle prints
+`already anchored; skipping the write`, sends **no** transaction, and still
+verifies against the chain. No transaction is ever sent for visual effect.
 
 ## Tests
 

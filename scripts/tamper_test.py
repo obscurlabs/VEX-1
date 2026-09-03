@@ -16,6 +16,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.bootstrap import require_dependencies  # noqa: E402
+
+require_dependencies()
+
 from src.evidence import hashing  # noqa: E402
 from src.evidence.collector import MANIFEST_FILE, verify_bundle  # noqa: E402
 

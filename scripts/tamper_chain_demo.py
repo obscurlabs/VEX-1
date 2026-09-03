@@ -20,6 +20,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.bootstrap import require_dependencies  # noqa: E402
+
+require_dependencies()
+
 from src.blockchain.verifier import verify_against_chain  # noqa: E402
 from src.evidence import hashing  # noqa: E402
 from src.evidence.collector import MANIFEST_FILE  # noqa: E402
