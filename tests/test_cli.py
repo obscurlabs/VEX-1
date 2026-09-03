@@ -341,3 +341,35 @@ def test_bootstrap_is_stdlib_only():
     src = (ROOT / "src" / "bootstrap.py").read_text(encoding="utf-8")
     for banned in ("import cv2", "import numpy", "import web3", "from src.config"):
         assert banned not in src, f"bootstrap must not import {banned}"
+
+
+# --- the bundle records its own anchor ----------------------------------
+
+def test_anchor_json_is_not_covered_by_the_fingerprint():
+    """The anchor references the evidence, never the reverse. If anchor.json
+    were hashed, writing it would invalidate the hash it records."""
+    from src.evidence.manifest import ARTIFACT_FILES
+
+    assert "anchor.json" not in ARTIFACT_FILES
+
+
+def test_anchor_json_does_not_disturb_verification(tmp_path):
+    """Adding an uncovered file to a bundle must not break verification."""
+    import json as _json
+    import shutil as _shutil
+
+    from src.evidence.collector import verify_bundle
+
+    root = ROOT / "evidence"
+    bundles = [p for p in root.glob("TRACE-*") if (p / "manifest.json").exists()]
+    if not bundles:
+        pytest.skip("no evidence bundle available")
+    source = max(bundles, key=lambda p: p.stat().st_mtime)
+
+    copy = tmp_path / "bundle"
+    _shutil.copytree(source, copy)
+    assert verify_bundle(copy).verified, "baseline bundle should verify"
+
+    (copy / "anchor.json").write_text(
+        _json.dumps({"anchor_tx": {"tx_hash": "0x" + "ab" * 32}}), encoding="utf-8")
+    assert verify_bundle(copy).verified, "an uncovered file must not affect the hash"

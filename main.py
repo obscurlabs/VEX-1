@@ -489,6 +489,30 @@ def run(args: argparse.Namespace) -> int:
         return EXIT_VERIFY
 
     ok("hash match")
+
+    # Record where this bundle was anchored. Written after the fingerprint and
+    # deliberately outside manifest.ARTIFACT_FILES: the anchor references the
+    # evidence, never the other way round, so it cannot alter any hash. Without
+    # it the transaction exists only in this terminal's scrollback.
+    store.write_json("anchor.json", {
+        "investigation_id": investigation_id,
+        "network": CONFIG.chain.network_name,
+        "chain_id": check.chain_id,
+        "contract_address": contract,
+        "local_sha256": digest,
+        "on_chain_sha256": check.on_chain_sha256,
+        "verified": check.verified,
+        "submitter": check.submitter,
+        "anchored_block": check.anchored_block,
+        "chain_timestamp": check.chain_timestamp,
+        "anchor_tx": anchor_receipt.to_dict() if anchor_receipt else None,
+        "explorer": (f"{CONFIG.chain.explorer}/tx/{anchor_receipt.tx_hash}"
+                     if anchor_receipt else None),
+        "note": ("no transaction was sent: this investigation was already "
+                 "anchored" if anchor_receipt is None else None),
+        "recorded_at": utc_now_iso(),
+    })
+
     _final_summary(investigation_id, independent or selected_match, digest,
                    anchor_receipt, check, store, started)
     verdict("BLOCKCHAIN VERIFIED")

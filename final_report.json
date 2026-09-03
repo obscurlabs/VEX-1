@@ -1,0 +1,1467 @@
+{
+  "report_schema_version": "1.0.0",
+  "project": "VEX-1 · HH Goa 2026 Task 3 · face evidence pipeline",
+  "created_at": "2026-09-03T12:17:36+00:00",
+  "git": {
+    "commit": "7d9517be3ed1730753c80225d8021854422926c8",
+    "branch": "main",
+    "dirty": true,
+    "uncommitted_paths": [
+      "EADME.md",
+      "final/",
+      "final_report.json",
+      "healthcheck.py",
+      "main.py",
+      "scripts/build_final_report.py",
+      "tests/test_cli.py"
+    ]
+  },
+  "environment": {
+    "python": "3.12.13",
+    "platform": "win32",
+    "interpreter": "python.exe",
+    "in_project_venv": true,
+    "packages": {
+      "opencv": "4.12.0",
+      "numpy": "2.2.6",
+      "onnxruntime": "1.29.0",
+      "insightface": "1.0.1",
+      "web3": "8.0.0",
+      "requests": "2.34.2",
+      "pyside6": "6.11.2"
+    }
+  },
+  "configuration": {
+    "serpapi_key_present": true,
+    "private_key_present": true,
+    "private_key_shape_valid": true,
+    "rpc_url_redacted": "https://polygon-amoy.g.alchemy.com/v2/<REDACTED>",
+    "contract_address": "0x9463c096472c67Fe85E931361904CDB6A6546b2E",
+    "expected_chain_id": 80002,
+    "network": "Polygon Amoy",
+    "match_threshold": 0.3,
+    "similarity_metric": "cosine",
+    "pipeline_version": "1.0.0",
+    "manifest_schema_version": "1.1.0",
+    "retrieval": {
+      "max_candidates": 25,
+      "concurrency": 5,
+      "connect_timeout": 6.0,
+      "read_timeout": 12.0
+    }
+  },
+  "health_check": {
+    "status": "PASS",
+    "totals": {
+      "PASS": 78,
+      "FAIL": 0,
+      "WARN": 1,
+      "NOT_RUN": 0,
+      "NOT_APPLICABLE": 0
+    },
+    "checks": [
+      {
+        "section": "environment",
+        "name": "python_version",
+        "status": "PASS",
+        "details": "3.12.13",
+        "value": "3.12.13",
+        "required": ">=3.11"
+      },
+      {
+        "section": "environment",
+        "name": "virtualenv",
+        "status": "PASS",
+        "details": "running from .venv"
+      },
+      {
+        "section": "environment",
+        "name": "dependencies",
+        "status": "PASS",
+        "details": "opencv 4.12.0, numpy 2.2.6, onnxruntime 1.29.0, insightface 1.0.1, requests 2.34.2, web3 8.0.0",
+        "versions": {
+          "opencv": "4.12.0",
+          "numpy": "2.2.6",
+          "onnxruntime": "1.29.0",
+          "insightface": "1.0.1",
+          "requests": "2.34.2",
+          "web3": "8.0.0"
+        }
+      },
+      {
+        "section": "environment",
+        "name": "opencv_roundtrip",
+        "status": "PASS",
+        "details": "encode/decode verified"
+      },
+      {
+        "section": "environment",
+        "name": "onnxruntime_providers",
+        "status": "PASS",
+        "details": "AzureExecutionProvider, CPUExecutionProvider",
+        "providers": [
+          "AzureExecutionProvider",
+          "CPUExecutionProvider"
+        ]
+      },
+      {
+        "section": "environment",
+        "name": "face_model_loads",
+        "status": "PASS",
+        "details": "buffalo_l · SCRFD + w600k_r50.onnx (1.9s)",
+        "model": {
+          "pack": "buffalo_l",
+          "detector": "SCRFD",
+          "detector_file": "det_10g.onnx",
+          "recognizer": "ArcFaceONNX",
+          "recognizer_file": "w600k_r50.onnx",
+          "providers": "CPUExecutionProvider"
+        },
+        "load_seconds": 1.88
+      },
+      {
+        "section": "configuration",
+        "name": "required_settings",
+        "status": "PASS",
+        "details": "all four present (values not shown)",
+        "present": {
+          "SERPAPI_KEY": true,
+          "POLYGON_RPC_URL": true,
+          "PRIVATE_KEY": true,
+          "CONTRACT_ADDRESS": true
+        }
+      },
+      {
+        "section": "configuration",
+        "name": "private_key_shape",
+        "status": "PASS",
+        "details": "64 hex characters (value never printed)"
+      },
+      {
+        "section": "configuration",
+        "name": "contract_address_shape",
+        "status": "PASS",
+        "details": "0x9463c096472c67Fe85E931361904CDB6A6546b2E",
+        "address": "0x9463c096472c67Fe85E931361904CDB6A6546b2E"
+      },
+      {
+        "section": "configuration",
+        "name": "chain_configuration",
+        "status": "PASS",
+        "details": "expecting chain 80002 (Polygon Amoy)",
+        "expected_chain_id": 80002
+      },
+      {
+        "section": "configuration",
+        "name": "thresholds",
+        "status": "PASS",
+        "details": "match 0.3 · det 0.5 · blur 10.0",
+        "match_threshold": 0.3
+      },
+      {
+        "section": "configuration",
+        "name": "env_gitignored",
+        "status": "PASS",
+        "details": "yes"
+      },
+      {
+        "section": "configuration",
+        "name": "env_never_committed",
+        "status": "PASS",
+        "details": "not tracked, absent from history"
+      },
+      {
+        "section": "input",
+        "name": "demo_input_exists",
+        "status": "PASS",
+        "details": "demo-target.jpg (163 KB)",
+        "path": "D:/Workspace/HHGOA26/townhall-3/inputs/demo-target.jpg",
+        "bytes": 167127
+      },
+      {
+        "section": "input",
+        "name": "demo_input_readable",
+        "status": "PASS",
+        "details": "742 x 990",
+        "width": 742,
+        "height": 990
+      },
+      {
+        "section": "input",
+        "name": "demo_input_face",
+        "status": "PASS",
+        "details": "1 face · 313x431px · det 0.917",
+        "faces_detected": 1,
+        "det_score": 0.9165
+      },
+      {
+        "section": "input",
+        "name": "embedding_shape",
+        "status": "PASS",
+        "details": "dim 512, L2 norm 1.000000",
+        "dim": 512,
+        "norm": 1.0
+      },
+      {
+        "section": "discovery",
+        "name": "serpapi_configured",
+        "status": "PASS",
+        "details": "key present (value not shown)"
+      },
+      {
+        "section": "discovery",
+        "name": "serpapi_authenticated",
+        "status": "PASS",
+        "details": "plan Free Plan"
+      },
+      {
+        "section": "discovery",
+        "name": "serpapi_quota",
+        "status": "PASS",
+        "details": "226 searches left",
+        "remaining": 226
+      },
+      {
+        "section": "discovery",
+        "name": "response_structure",
+        "status": "PASS",
+        "details": "59 visual_matches, all expected fields present",
+        "visual_matches": 59
+      },
+      {
+        "section": "discovery",
+        "name": "normalizer",
+        "status": "PASS",
+        "details": "65 candidates from 68 raw rows",
+        "normalized": 65,
+        "raw_rows": 68
+      },
+      {
+        "section": "discovery",
+        "name": "raw_response_preserved",
+        "status": "PASS",
+        "details": "stored bytes differ from any re-serialisation, so preservation is real"
+      },
+      {
+        "section": "retrieval",
+        "name": "failure_classification",
+        "status": "PASS",
+        "details": "RETRIEVED HTTP_403 HTTP_404 INVALID_IMAGE FETCH_FAILED",
+        "expected": [
+          "RETRIEVED",
+          "HTTP_403",
+          "HTTP_404",
+          "INVALID_IMAGE",
+          "FETCH_FAILED"
+        ],
+        "observed": [
+          "RETRIEVED",
+          "HTTP_403",
+          "HTTP_404",
+          "INVALID_IMAGE",
+          "FETCH_FAILED"
+        ]
+      },
+      {
+        "section": "retrieval",
+        "name": "candidate_isolation",
+        "status": "PASS",
+        "details": "one failure never terminates the run; all 5 produced a result",
+        "results": 5
+      },
+      {
+        "section": "retrieval",
+        "name": "content_bytes_preserved",
+        "status": "PASS",
+        "details": "432 bytes retained verbatim"
+      },
+      {
+        "section": "retrieval",
+        "name": "content_hash_correct",
+        "status": "PASS",
+        "details": "sha256 804b6fde0b32a6e4… matches an independent digest"
+      },
+      {
+        "section": "retrieval",
+        "name": "bounded_concurrency",
+        "status": "PASS",
+        "details": "concurrency 5 · connect 6.0s · read 12.0s",
+        "concurrency": 5,
+        "socket_worst_case_seconds": 18.0
+      },
+      {
+        "section": "retrieval",
+        "name": "dns_not_covered_by_socket_timeouts",
+        "status": "WARN",
+        "details": "getaddrinfo is an OS call that connect/read timeouts do not bound; an unresponsive resolver has been observed to extend one candidate to ~83s. Correctness is unaffected - the candidate is classified FETCH_FAILED and the run continues - but a stage can run long.",
+        "observed_worst_case_seconds": 83
+      },
+      {
+        "section": "matching",
+        "name": "similarity_is_real",
+        "status": "PASS",
+        "details": "self-similarity 1.000000 (expected 1.0)",
+        "self_similarity": 1.0
+      },
+      {
+        "section": "matching",
+        "name": "similarity_discriminates",
+        "status": "PASS",
+        "details": "mirrored image scores 0.9662, not 1.0",
+        "mirrored_similarity": 0.9662
+      },
+      {
+        "section": "matching",
+        "name": "threshold_respected",
+        "status": "PASS",
+        "details": "5 of 6 cleared 0.3",
+        "qualifying": 5
+      },
+      {
+        "section": "matching",
+        "name": "ranking_ordered",
+        "status": "PASS",
+        "details": "descending: [1.0, 0.95, 0.91, 0.88, 0.8]"
+      },
+      {
+        "section": "matching",
+        "name": "duplicate_grouping",
+        "status": "PASS",
+        "details": "5 qualifying → 3 independent sources",
+        "qualifying": 5,
+        "independent": 3
+      },
+      {
+        "section": "matching",
+        "name": "backwards_compatible_accessor",
+        "status": "PASS",
+        "details": "best_independent_match() is the first ranked group's representative"
+      },
+      {
+        "section": "matching",
+        "name": "identical_input_excluded",
+        "status": "PASS",
+        "details": "the input file rediscovered is never an independent source"
+      },
+      {
+        "section": "matching",
+        "name": "multiple_face_policy",
+        "status": "PASS",
+        "details": "MULTIPLE_FACE_MATCH counts as a match but stays distinct from MATCH"
+      },
+      {
+        "section": "matching",
+        "name": "no_probability_language",
+        "status": "PASS",
+        "details": "similarity is presented as cosine everywhere"
+      },
+      {
+        "section": "evidence",
+        "name": "bundle_available",
+        "status": "PASS",
+        "details": "evidence/TRACE-20260903-FC24B6",
+        "bundle": "evidence/TRACE-20260903-FC24B6"
+      },
+      {
+        "section": "evidence",
+        "name": "artifacts_present",
+        "status": "PASS",
+        "details": "7 of 7: input.jpg, source-image.jpg, search-request.json, search-response.json, candidates.json, retrieval.json, matching.json",
+        "artifacts": [
+          "input.jpg",
+          "source-image.jpg",
+          "search-request.json",
+          "search-response.json",
+          "candidates.json",
+          "retrieval.json",
+          "matching.json"
+        ]
+      },
+      {
+        "section": "evidence",
+        "name": "manifest_is_canonical",
+        "status": "PASS",
+        "details": "the stored file IS the bytes that were hashed"
+      },
+      {
+        "section": "evidence",
+        "name": "artifact_digests_verify",
+        "status": "PASS",
+        "details": "7 artifacts match their recorded digests",
+        "checked": 7
+      },
+      {
+        "section": "evidence",
+        "name": "fingerprint_recomputes",
+        "status": "PASS",
+        "details": "cc5cfd67615fa27a… reproduced from the files on disk",
+        "evidence_sha256": "cc5cfd67615fa27a5519c25ee05166c44877f0746bf547df94dd9043b2c5ea65"
+      },
+      {
+        "section": "evidence",
+        "name": "fingerprint_not_authoritative",
+        "status": "PASS",
+        "details": "a falsified fingerprint.json does not change the recomputed hash"
+      },
+      {
+        "section": "evidence",
+        "name": "raw_response_byte_preserved",
+        "status": "PASS",
+        "details": "82383 bytes, digest matches, differs from re-serialisation"
+      },
+      {
+        "section": "evidence",
+        "name": "manifest_has_no_secrets",
+        "status": "PASS",
+        "details": "no credential-shaped keys or embeddings"
+      },
+      {
+        "section": "evidence",
+        "name": "no_biometric_embeddings",
+        "status": "PASS",
+        "details": "no face embedding is written to the bundle"
+      },
+      {
+        "section": "evidence",
+        "name": "ranked_match_completeness",
+        "status": "PASS",
+        "details": "18 independent sources, all required fields present",
+        "independent_sources": 18
+      },
+      {
+        "section": "evidence",
+        "name": "legacy_selected_match",
+        "status": "PASS",
+        "details": "retained for backwards compatibility"
+      },
+      {
+        "section": "evidence",
+        "name": "legacy_best_independent_match",
+        "status": "PASS",
+        "details": "retained for backwards compatibility"
+      },
+      {
+        "section": "evidence",
+        "name": "tamper_detection",
+        "status": "PASS",
+        "details": "6/6 mutations detected; original verifies before=True after=True",
+        "detected": 6,
+        "total": 6,
+        "original_intact": true
+      },
+      {
+        "section": "blockchain",
+        "name": "contract_artifact",
+        "status": "PASS",
+        "details": "solc 0.8.26 · 975 bytes deployed",
+        "solc": "0.8.26",
+        "source_sha256": "3ff1f2b4a5442f0847080323acc95d70cc3ca7554641b62ed8c1e0f12b998868"
+      },
+      {
+        "section": "blockchain",
+        "name": "rpc_endpoint",
+        "status": "PASS",
+        "details": "https://polygon-amoy.g.alchemy.com/v2/<REDACTED>",
+        "rpc": "https://polygon-amoy.g.alchemy.com/v2/<REDACTED>"
+      },
+      {
+        "section": "blockchain",
+        "name": "rpc_reachable",
+        "status": "PASS",
+        "details": "responds to eth_chainId"
+      },
+      {
+        "section": "blockchain",
+        "name": "chain_id",
+        "status": "PASS",
+        "details": "80002 (Polygon Amoy)",
+        "chain_id": 80002
+      },
+      {
+        "section": "blockchain",
+        "name": "contract_deployed",
+        "status": "PASS",
+        "details": "975 bytes of code at 0x9463c096472c67Fe85E931361904CDB6A6546b2E",
+        "address": "0x9463c096472c67Fe85E931361904CDB6A6546b2E",
+        "bytecode_bytes": 975
+      },
+      {
+        "section": "blockchain",
+        "name": "bytecode_matches_source",
+        "status": "PASS",
+        "details": "deployed bytecode is byte-identical to the compiled contract"
+      },
+      {
+        "section": "blockchain",
+        "name": "contract_interface",
+        "status": "PASS",
+        "details": "totalAnchored() = 19",
+        "total_anchored": 19
+      },
+      {
+        "section": "blockchain",
+        "name": "verification_without_key",
+        "status": "PASS",
+        "details": "read-only client has no wallet and still reads the contract",
+        "wallet": null
+      },
+      {
+        "section": "blockchain",
+        "name": "wallet_configured",
+        "status": "PASS",
+        "details": "0x5Bd62F6d99e3f91B6a7299490B2122c4Ac75087A",
+        "wallet": "0x5Bd62F6d99e3f91B6a7299490B2122c4Ac75087A"
+      },
+      {
+        "section": "blockchain",
+        "name": "wallet_balance",
+        "status": "PASS",
+        "details": "0.059646 POL",
+        "balance_pol": 0.059646
+      },
+      {
+        "section": "chain_verification",
+        "name": "bundle_verifies_on_chain",
+        "status": "PASS",
+        "details": "VERIFIED: local == on-chain",
+        "bundle": "evidence/TRACE-20260903-FC24B6",
+        "verification_status": "VERIFIED",
+        "local_sha256": "cc5cfd67615fa27a5519c25ee05166c44877f0746bf547df94dd9043b2c5ea65",
+        "on_chain_sha256": "cc5cfd67615fa27a5519c25ee05166c44877f0746bf547df94dd9043b2c5ea65",
+        "contract_address": "0x9463c096472c67Fe85E931361904CDB6A6546b2E",
+        "chain_id": 80002,
+        "submitter": "0x5Bd62F6d99e3f91B6a7299490B2122c4Ac75087A",
+        "anchored_block": 46618969
+      },
+      {
+        "section": "chain_verification",
+        "name": "local_equals_on_chain",
+        "status": "PASS",
+        "details": "cc5cfd67615fa27a… == cc5cfd67615fa27a…"
+      },
+      {
+        "section": "chain_verification",
+        "name": "contract_verifyEvidence_true",
+        "status": "PASS",
+        "details": "the contract itself confirms the fingerprint"
+      },
+      {
+        "section": "chain_verification",
+        "name": "wrong_hash_rejected",
+        "status": "PASS",
+        "details": "a one-character change is rejected on chain"
+      },
+      {
+        "section": "chain_verification",
+        "name": "unknown_investigation_rejected",
+        "status": "PASS",
+        "details": "an unanchored id reports not anchored"
+      },
+      {
+        "section": "security",
+        "name": "no_secrets_in_tracked_files",
+        "status": "PASS",
+        "details": "80 files scanned, no secret values found",
+        "files_scanned": 80
+      },
+      {
+        "section": "security",
+        "name": "no_secrets_in_evidence",
+        "status": "PASS",
+        "details": "1557 files scanned, no secret values found",
+        "files_scanned": 1557
+      },
+      {
+        "section": "security",
+        "name": "no_secrets_in_build",
+        "status": "PASS",
+        "details": "2 files scanned, no secret values found",
+        "files_scanned": 2
+      },
+      {
+        "section": "security",
+        "name": "tx_result_has_no_key",
+        "status": "PASS",
+        "details": "fields: ['block_hash', 'block_number', 'contract_address', 'effective_gas_price_wei', 'fee_pol', 'fee_wei', 'from', 'gas_used', 'status', 'to', 'tx_hash']"
+      },
+      {
+        "section": "security",
+        "name": "run_result_has_no_secrets",
+        "status": "PASS",
+        "details": "fields: ['bundle_path', 'elapsed_seconds', 'evidence_sha256', 'investigation_id', 'match', 'receipt', 'verification']"
+      },
+      {
+        "section": "security",
+        "name": "config_repr_safe",
+        "status": "PASS",
+        "details": "repr(CONFIG) exposes no key"
+      },
+      {
+        "section": "security",
+        "name": "wallet_errors_redacted",
+        "status": "PASS",
+        "details": "the rejected key is never echoed"
+      },
+      {
+        "section": "reproducibility",
+        "name": "canonical_hash_deterministic",
+        "status": "PASS",
+        "details": "50 runs produced 1 digest(s)"
+      },
+      {
+        "section": "reproducibility",
+        "name": "key_order_irrelevant",
+        "status": "PASS",
+        "details": "insertion order does not change the bytes"
+      },
+      {
+        "section": "reproducibility",
+        "name": "unicode_normalised",
+        "status": "PASS",
+        "details": "NFC-equivalent strings hash alike"
+      },
+      {
+        "section": "reproducibility",
+        "name": "floats_rejected",
+        "status": "PASS",
+        "details": "raw floats are refused; values are decimal strings"
+      },
+      {
+        "section": "reproducibility",
+        "name": "copied_bundle_verifies",
+        "status": "PASS",
+        "details": "a copied bundle produces the same fingerprint"
+      },
+      {
+        "section": "reproducibility",
+        "name": "historical_bundles_verify",
+        "status": "PASS",
+        "details": "198/198 bundles still verify locally",
+        "total": 198,
+        "failed": 0
+      }
+    ],
+    "source": "final/healthcheck.json"
+  },
+  "tests": {
+    "status": "PASS",
+    "total": 340,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 182.4,
+    "by_module": {
+      "tests": 340
+    }
+  },
+  "live_run": {
+    "status": "PASS",
+    "investigation_id": "TRACE-20260903-FC24B6",
+    "created_at": "2026-09-03T12:09:47+00:00",
+    "bundle": "evidence/TRACE-20260903-FC24B6",
+    "input": {
+      "bytes": 167127,
+      "face": {
+        "bbox": [
+          205,
+          172,
+          518,
+          603
+        ],
+        "det_score": "0.9165",
+        "faces_detected": 1,
+        "height": 431,
+        "width": 313
+      },
+      "file": "input.jpg",
+      "height": 990,
+      "sha256": "bdafb1e7609c872f309862fde0d68b8e573d67613170726cb305f276b41ce820",
+      "width": 742
+    },
+    "discovery": {
+      "candidates_evaluated": 25,
+      "engine": "google_lens",
+      "image_id": "KBlo33icu2lgmZJoZmCWaGlmkWyaapxkbJCcYp6WmmaZZGSQbJhkZK6XVZCaHm9obmFhYmxubGkIAITNDnI",
+      "live": true,
+      "normalized_candidate_count": 65,
+      "provider": "google_lens",
+      "raw_response_file": "search-response.json",
+      "raw_result_count": 68,
+      "requested_at": "2026-09-03T12:09:47+00:00",
+      "search_id": "6a99638f1dcfe2429669a113"
+    },
+    "retrieval": {
+      "bytes_downloaded": 32796,
+      "candidates_attempted": 25,
+      "candidates_retrieved": 21,
+      "content_sha256": "140591836b792d3c5b3843d2ed2b033b160c6830066b983188f7b092ac0057e6",
+      "content_type": "image/webp",
+      "http_status": 200,
+      "retrieved_at": "2026-09-03T12:09:53+00:00"
+    },
+    "matching": {
+      "threshold": "0.300000",
+      "similarity_metric": "cosine",
+      "census": {
+        "discovered": 65,
+        "evaluated": 25,
+        "face_matched": 20,
+        "independent": 18,
+        "qualifying": 20,
+        "retrieved": 21
+      },
+      "qualifying_count": 20,
+      "independent_count": 18,
+      "selected_match": {
+        "rank": null,
+        "source_url": "https://en.wikipedia.org/wiki/Premiership_of_Justin_Trudeau",
+        "source_domain": "en.wikipedia.org",
+        "title": "Premiership of Justin Trudeau - Wikipedia",
+        "search_position": 2,
+        "similarity": "1.000000",
+        "status": "MATCH",
+        "faces_detected": 1,
+        "selected_face_index": 0,
+        "retrieval_status": "RETRIEVED",
+        "content_sha256": "bdafb1e7609c872f309862fde0d68b8e573d67613170726cb305f276b41ce820",
+        "identical_to_input": true,
+        "group_size": null,
+        "duplicates": []
+      },
+      "best_independent_match": {
+        "rank": null,
+        "source_url": "https://www.wdayradionow.com/news/justin-trudeau-resigns-as-prime-minister-of-canada/",
+        "source_domain": "wdayradionow.com",
+        "title": "Justin Trudeau resigns as Prime Minister of Canada | WDAY ...",
+        "search_position": 21,
+        "similarity": "0.989948",
+        "status": "MATCH",
+        "faces_detected": 1,
+        "selected_face_index": 0,
+        "retrieval_status": "RETRIEVED",
+        "content_sha256": "140591836b792d3c5b3843d2ed2b033b160c6830066b983188f7b092ac0057e6",
+        "identical_to_input": false,
+        "group_size": null,
+        "duplicates": []
+      },
+      "matches": [
+        {
+          "rank": 1,
+          "source_url": "https://www.wdayradionow.com/news/justin-trudeau-resigns-as-prime-minister-of-canada/",
+          "source_domain": "wdayradionow.com",
+          "title": "Justin Trudeau resigns as Prime Minister of Canada | WDAY ...",
+          "search_position": 21,
+          "similarity": "0.989948",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "140591836b792d3c5b3843d2ed2b033b160c6830066b983188f7b092ac0057e6",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 2,
+          "source_url": "https://opencouncil.ca/trudeau-says-housing-needs-to-retain-its-value/",
+          "source_domain": "opencouncil.ca",
+          "title": "Trudeau says housing needs to retain its value - Open Council",
+          "search_position": 8,
+          "similarity": "0.985903",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "85726d70c623cdd45d6735019bd4a0f33537d81219e9bc6435a9520b376de02f",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 3,
+          "source_url": "https://en.wikipedia.org/wiki/Justin_Trudeau",
+          "source_domain": "en.wikipedia.org",
+          "title": "Justin Trudeau - Wikipedia",
+          "search_position": 1,
+          "similarity": "0.983434",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "09e5165e6541e7ecbad96be420ef279a3723dbaa00e0f3de1a45f69002fc669e",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 4,
+          "source_url": "https://www.youtube.com/watch?v=49n4kFjmvmU",
+          "source_domain": "youtube.com",
+          "title": "Justin Trudeau's Legacy (THE SAAD TRUTH_1794) - YouTube",
+          "search_position": 4,
+          "similarity": "0.977200",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "dc22869eda3509de3caf40bc2760e51d0b166358e066384a91af1a319f9db654",
+          "identical_to_input": false,
+          "group_size": 2,
+          "duplicates": [
+            {
+              "source_domain": "youtube.com",
+              "similarity": "0.764844",
+              "duplicate_reason": "same source domain"
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "source_url": "https://www.linkedin.com/pulse/justin-trudeau-tayfun-genç-suhef",
+          "source_domain": "linkedin.com",
+          "title": "Justin Trudeau",
+          "search_position": 13,
+          "similarity": "0.907703",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "ad64e886ef2c8448e11d3167f6f0e654ae050256ba14f7003878e4179197290b",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 6,
+          "source_url": "https://www.hellomagazine.com/celebrities/736617/meet-justin-trudeaus-surprisingly-normal-children/",
+          "source_domain": "hellomagazine.com",
+          "title": "Inside Justin Trudeau's family life with three children as ...",
+          "search_position": 10,
+          "similarity": "0.828126",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "0e5c5be679df9307c0cd63cc3cfc024758cb44f145d758aa247b54c9bbfa5522",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 7,
+          "source_url": "https://www.teenvogue.com/story/justin-trudeau-three-brown-blackface-scandal",
+          "source_domain": "teenvogue.com",
+          "title": "Justin Trudeau Is Wrapped Up In Three Separate Brown- and ...",
+          "search_position": 19,
+          "similarity": "0.825614",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "f6d24a6de458830a9408daf231049184d07d63bb7b667bb3d806df5cc4c400b3",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 8,
+          "source_url": "https://commons.wikimedia.org/wiki/File:Justin_Trudeau_-_2023_-_P060471-316758_(cropped).jpg",
+          "source_domain": "commons.wikimedia.org",
+          "title": "File:Justin Trudeau - 2023 - P060471-316758 (cropped).jpg ...",
+          "search_position": 12,
+          "similarity": "0.798560",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "27f0fc9609a5c8c5a3802a7c5ed0b07f3e8195e9da03de605ec9be8b2d911b3b",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 9,
+          "source_url": "https://www.forbes.com/pictures/5637c70ae4b0ffa7afe68e5e/justin-trudeau/",
+          "source_domain": "forbes.com",
+          "title": "CANADA-VOTE-TRUDEAU - 2015-11-02 - Justin Trudeau",
+          "search_position": 7,
+          "similarity": "0.791569",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "525aac8b44a7c30537a43d64179b5569a861bb3ff0b724b1983ab50150d7e48b",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 10,
+          "source_url": "https://www.nowtolove.com.au/celebrity/celebrity-news/get-to-know-canadian-prime-minister-justin-trudeau-32665/",
+          "source_domain": "nowtolove.com.au",
+          "title": "Get to know Canadian prime minister Justin Trudeau",
+          "search_position": 11,
+          "similarity": "0.791194",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "1b5fee39b6dd4c5a3d01b5b34f4d631605e238b861bf0cce8f3d2d16f9aeead7",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 11,
+          "source_url": "https://www.reddit.com/r/TheCrownNetflix/comments/181q86f/is_it_just_me/",
+          "source_domain": "reddit.com",
+          "title": "Is It Just Me…..???? : r/TheCrownNetflix",
+          "search_position": 3,
+          "similarity": "0.790273",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "6e3f7ce61d15e0cc45cf316cc5c814c75b2705960cdbbbba5a23a29c3975889e",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 12,
+          "source_url": "https://people.com/celebrity/who-is-justin-trudeau-things-to-know-about-the-canadian-prime-minister/",
+          "source_domain": "people.com",
+          "title": "Who Is Justin Trudeau? Things to Know About the Canadian ...",
+          "search_position": 5,
+          "similarity": "0.782605",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "fe57812d593b1f4addffaaadc358166a53600a651c24d09cbc7a053ad0af89df",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 13,
+          "source_url": "https://www.nytimes.com/topic/justin-trudeau",
+          "source_domain": "nytimes.com",
+          "title": "Justin Trudeau - The New York Times",
+          "search_position": 22,
+          "similarity": "0.770894",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "7bd04a9fd1c182f2df613a1df6f71d8791ecc58932c76221bf4f096da31266b2",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 14,
+          "source_url": "https://www.snopes.com/fact-check/did-trudeau-canada-american-farmers/",
+          "source_domain": "snopes.com",
+          "title": "Did Canada's Prime Minister Say Canadians Don't Need ...",
+          "search_position": 14,
+          "similarity": "0.766925",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "61945f58144f7ee17498c8b840bd8828891fa3486b5693410f6733e34f3375b4",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 15,
+          "source_url": "https://chatelaine.com/opinion/justin-trudeau-pro-choice/",
+          "source_domain": "chatelaine.com",
+          "title": "Why Justin Trudeau's Pro-Choice Requirement Makes Me ...",
+          "search_position": 17,
+          "similarity": "0.761795",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "57b26e0c15040920a556290f421702e5c6bccfe44c1be13a7888776b0353fd14",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 16,
+          "source_url": "https://superepicfailpedia.fandom.com/wiki/Justin_Trudeau/Quotes",
+          "source_domain": "superepicfailpedia.fandom.com",
+          "title": "Justin Trudeau | SuperEpicFailpedia Wiki | Fandom",
+          "search_position": 20,
+          "similarity": "0.752162",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "d601cc78476102144e36d7366f3249adc19c124a7deb686fab8415ff72d329a8",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 17,
+          "source_url": "https://www.poynter.org/fact-checking/2022/justin-trudeau-600-million-dollar-media-bribe/",
+          "source_domain": "poynter.org",
+          "title": "Justin Trudeau was joking when he suggested he bribed the ...",
+          "search_position": 25,
+          "similarity": "0.748710",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "5f7623a852e4ac44bbf03430551c3d06630984fddf1dfa3dcc01748354d0502f",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        },
+        {
+          "rank": 18,
+          "source_url": "https://simple.wikipedia.org/wiki/Justin_Trudeau",
+          "source_domain": "simple.wikipedia.org",
+          "title": "Justin Trudeau - Simple English Wikipedia, the free encyclopedia",
+          "search_position": 16,
+          "similarity": "0.744778",
+          "status": "MATCH",
+          "faces_detected": 1,
+          "selected_face_index": 0,
+          "retrieval_status": "RETRIEVED",
+          "content_sha256": "07d236ee05d892eeaac5b823d7c0b0909cb1630db74de0767e197debb47d6581",
+          "identical_to_input": false,
+          "group_size": 1,
+          "duplicates": []
+        }
+      ]
+    },
+    "evidence": {
+      "schema_version": "1.1.0",
+      "evidence_sha256": "cc5cfd67615fa27a5519c25ee05166c44877f0746bf547df94dd9043b2c5ea65",
+      "artifacts": {
+        "candidates.json": {
+          "bytes": 35423,
+          "sha256": "374f07e362957e195aa1b112fb88694e4cc7f0ad836eb3a02d5c0a98a561c815"
+        },
+        "input.jpg": {
+          "bytes": 167127,
+          "sha256": "bdafb1e7609c872f309862fde0d68b8e573d67613170726cb305f276b41ce820"
+        },
+        "matching.json": {
+          "bytes": 60917,
+          "sha256": "63d38c2067819207454bde4b2e89e1abd19295b59dbb23b063449a8f18d11cad"
+        },
+        "retrieval.json": {
+          "bytes": 21694,
+          "sha256": "54aa43876a67f62a304d6353f3068ec2734468e614d60811e74c7e417af93d52"
+        },
+        "search-request.json": {
+          "bytes": 307,
+          "sha256": "a680f715901e4cde9fb362b1ffa3c50a56160a45468bf16e58e7a8b8204f94ac"
+        },
+        "search-response.json": {
+          "bytes": 82383,
+          "sha256": "efad1c9e5b649fcbf41020464d2683c9dc3009dfb1328843bcb50082be867952"
+        },
+        "source-image.jpg": {
+          "bytes": 32796,
+          "sha256": "140591836b792d3c5b3843d2ed2b033b160c6830066b983188f7b092ac0057e6"
+        }
+      }
+    },
+    "model": {
+      "detector": "SCRFD",
+      "detector_file": "det_10g.onnx",
+      "embedding_dim": 512,
+      "model_pack": "buffalo_l",
+      "providers": "CPUExecutionProvider",
+      "recognizer": "ArcFace",
+      "recognizer_file": "w600k_r50.onnx"
+    },
+    "blockchain": {
+      "network": "Polygon Amoy",
+      "chain_id": 80002,
+      "contract_address": "0x9463c096472c67Fe85E931361904CDB6A6546b2E",
+      "transaction_hash": "0xf5810683d6f3cda120057eaf68873a30c9324f44682cbe993c9439eb01b2a01b",
+      "block_number": 46618969,
+      "gas_used": 134893,
+      "fee_pol": "0.004460462",
+      "submitter": "0x5Bd62F6d99e3f91B6a7299490B2122c4Ac75087A"
+    },
+    "command": "-u main.py --image inputs/demo-target.jpg --mode live",
+    "exit_code": 0,
+    "wall_clock_seconds": 30.14,
+    "timings": {
+      "measurement": "wall clock, observed externally from when each stage banner reached the capturing process",
+      "stages": {
+        "01": {
+          "title": "FACE SCAN",
+          "seconds": 3.1
+        },
+        "02": {
+          "title": "WEB DISCOVERY",
+          "seconds": 3.4
+        },
+        "03": {
+          "title": "CANDIDATE RETRIEVAL",
+          "seconds": 3.82
+        },
+        "04": {
+          "title": "FACE MATCHING",
+          "seconds": 6.45
+        },
+        "05": {
+          "title": "EVIDENCE",
+          "seconds": 0.16
+        },
+        "06": {
+          "title": "BLOCKCHAIN",
+          "seconds": 6.1
+        },
+        "07": {
+          "title": "VERIFICATION",
+          "seconds": 4.68
+        }
+      },
+      "total_seconds": 30.14
+    }
+  },
+  "verification": {
+    "status": "PASS",
+    "details": "locally recomputed fingerprint equals the fingerprint read from the contract",
+    "verification_status": "VERIFIED",
+    "local_sha256": "cc5cfd67615fa27a5519c25ee05166c44877f0746bf547df94dd9043b2c5ea65",
+    "on_chain_sha256": "cc5cfd67615fa27a5519c25ee05166c44877f0746bf547df94dd9043b2c5ea65",
+    "recorded_sha256_advisory_only": "cc5cfd67615fa27a5519c25ee05166c44877f0746bf547df94dd9043b2c5ea65",
+    "contract_verify_evidence": true,
+    "chain_id": 80002,
+    "contract_address": "0x9463c096472c67Fe85E931361904CDB6A6546b2E",
+    "submitter": "0x5Bd62F6d99e3f91B6a7299490B2122c4Ac75087A",
+    "anchored_block": 46618969,
+    "artifacts_checked": [
+      "candidates.json",
+      "input.jpg",
+      "matching.json",
+      "retrieval.json",
+      "search-request.json",
+      "search-response.json",
+      "source-image.jpg"
+    ],
+    "private_key_required": false
+  },
+  "tamper_tests": {
+    "cases": [
+      {
+        "case": "one digit changed in the manifest",
+        "layer": "manifest",
+        "mutation": "similarity 0.989948 -> 0.989949",
+        "status": "PASS",
+        "detected_by": "manifest fingerprint"
+      },
+      {
+        "case": "source URL changed in the manifest",
+        "layer": "manifest",
+        "mutation": "https://www.wdayradionow.com/news/justin-tru... -> attacker.example",
+        "status": "PASS",
+        "detected_by": "manifest fingerprint"
+      },
+      {
+        "case": "candidate image byte flipped",
+        "layer": "artifact",
+        "mutation": "last byte of source-image.jpg XOR 0xFF",
+        "status": "PASS",
+        "detected_by": "artifact digest"
+      },
+      {
+        "case": "raw search response altered",
+        "layer": "artifact",
+        "mutation": "one position field rewritten",
+        "status": "PASS",
+        "detected_by": "artifact digest"
+      },
+      {
+        "case": "artifact deleted",
+        "layer": "artifact",
+        "mutation": "input.jpg removed",
+        "status": "PASS",
+        "detected_by": "artifact digest"
+      },
+      {
+        "case": "manifest digest updated to cover a modified artifact",
+        "layer": "manifest",
+        "mutation": "image altered AND manifest digest re-signed",
+        "status": "PASS",
+        "detected_by": "manifest fingerprint"
+      }
+    ],
+    "detected": 6,
+    "total": 6,
+    "original_verified_before": true,
+    "original_verified_after": true
+  },
+  "failure_paths": {
+    "cases": [
+      {
+        "name": "missing_image",
+        "status": "PASS",
+        "exit_code": 1,
+        "expected_exit_code": 1,
+        "expected_text_present": true,
+        "traceback_shown": false,
+        "secret_leaked": false,
+        "silent_cache_fallback": false,
+        "notes": []
+      },
+      {
+        "name": "unreadable_image",
+        "status": "PASS",
+        "exit_code": 1,
+        "expected_exit_code": 1,
+        "expected_text_present": true,
+        "traceback_shown": false,
+        "secret_leaked": false,
+        "silent_cache_fallback": false,
+        "notes": []
+      },
+      {
+        "name": "no_face_in_image",
+        "status": "PASS",
+        "exit_code": 1,
+        "expected_exit_code": 1,
+        "expected_text_present": true,
+        "traceback_shown": false,
+        "secret_leaked": false,
+        "silent_cache_fallback": false,
+        "notes": []
+      },
+      {
+        "name": "invalid_api_key",
+        "status": "PASS",
+        "exit_code": 2,
+        "expected_exit_code": 2,
+        "expected_text_present": true,
+        "traceback_shown": false,
+        "secret_leaked": false,
+        "silent_cache_fallback": false,
+        "notes": []
+      },
+      {
+        "name": "missing_api_key",
+        "status": "PASS",
+        "exit_code": 2,
+        "expected_exit_code": 2,
+        "expected_text_present": true,
+        "traceback_shown": false,
+        "secret_leaked": false,
+        "silent_cache_fallback": false,
+        "notes": []
+      },
+      {
+        "name": "missing_cached_response",
+        "status": "PASS",
+        "exit_code": 4,
+        "expected_exit_code": 4,
+        "expected_text_present": true,
+        "traceback_shown": false,
+        "secret_leaked": false,
+        "silent_cache_fallback": false,
+        "notes": []
+      },
+      {
+        "name": "no_qualifying_match",
+        "status": "PASS",
+        "exit_code": 5,
+        "expected_exit_code": 5,
+        "expected_text_present": true,
+        "traceback_shown": false,
+        "secret_leaked": false,
+        "silent_cache_fallback": false,
+        "notes": []
+      },
+      {
+        "name": "dead_rpc",
+        "status": "PASS",
+        "exit_code": 7,
+        "expected_exit_code": 7,
+        "expected_text_present": true,
+        "traceback_shown": false,
+        "secret_leaked": false,
+        "silent_cache_fallback": false,
+        "notes": []
+      },
+      {
+        "name": "wrong_chain",
+        "status": "PASS",
+        "exit_code": 7,
+        "expected_exit_code": 7,
+        "expected_text_present": true,
+        "traceback_shown": false,
+        "secret_leaked": false,
+        "silent_cache_fallback": false,
+        "notes": []
+      },
+      {
+        "name": "malformed_private_key",
+        "status": "PASS",
+        "exit_code": 7,
+        "expected_exit_code": 7,
+        "expected_text_present": true,
+        "traceback_shown": false,
+        "secret_leaked": false,
+        "silent_cache_fallback": false,
+        "notes": []
+      },
+      {
+        "name": "missing_contract_address",
+        "status": "PASS",
+        "exit_code": 7,
+        "expected_exit_code": 7,
+        "expected_text_present": true,
+        "traceback_shown": false,
+        "secret_leaked": false,
+        "silent_cache_fallback": false,
+        "notes": []
+      },
+      {
+        "name": "verify_missing_bundle",
+        "status": "PASS",
+        "exit_code": 1,
+        "expected_exit_code": 1,
+        "expected_text_present": true,
+        "traceback_shown": false,
+        "secret_leaked": false,
+        "silent_cache_fallback": false,
+        "notes": []
+      },
+      {
+        "name": "chain_verify_missing_bundle",
+        "status": "PASS",
+        "exit_code": 1,
+        "expected_exit_code": 1,
+        "expected_text_present": true,
+        "traceback_shown": false,
+        "secret_leaked": false,
+        "silent_cache_fallback": false,
+        "notes": []
+      }
+    ],
+    "passed": 13,
+    "failed": 0,
+    "total": 13
+  },
+  "security_audit": {
+    "status": "PASS",
+    "checks": [
+      {
+        "section": "security",
+        "name": "no_secrets_in_tracked_files",
+        "status": "PASS",
+        "details": "80 files scanned, no secret values found",
+        "files_scanned": 80
+      },
+      {
+        "section": "security",
+        "name": "no_secrets_in_evidence",
+        "status": "PASS",
+        "details": "1557 files scanned, no secret values found",
+        "files_scanned": 1557
+      },
+      {
+        "section": "security",
+        "name": "no_secrets_in_build",
+        "status": "PASS",
+        "details": "2 files scanned, no secret values found",
+        "files_scanned": 2
+      },
+      {
+        "section": "security",
+        "name": "tx_result_has_no_key",
+        "status": "PASS",
+        "details": "fields: ['block_hash', 'block_number', 'contract_address', 'effective_gas_price_wei', 'fee_pol', 'fee_wei', 'from', 'gas_used', 'status', 'to', 'tx_hash']"
+      },
+      {
+        "section": "security",
+        "name": "run_result_has_no_secrets",
+        "status": "PASS",
+        "details": "fields: ['bundle_path', 'elapsed_seconds', 'evidence_sha256', 'investigation_id', 'match', 'receipt', 'verification']"
+      },
+      {
+        "section": "security",
+        "name": "config_repr_safe",
+        "status": "PASS",
+        "details": "repr(CONFIG) exposes no key"
+      },
+      {
+        "section": "security",
+        "name": "wallet_errors_redacted",
+        "status": "PASS",
+        "details": "the rejected key is never echoed"
+      }
+    ],
+    "report_contains_no_secrets": true
+  },
+  "reproducibility": {
+    "status": "PASS",
+    "checks": [
+      {
+        "section": "reproducibility",
+        "name": "canonical_hash_deterministic",
+        "status": "PASS",
+        "details": "50 runs produced 1 digest(s)"
+      },
+      {
+        "section": "reproducibility",
+        "name": "key_order_irrelevant",
+        "status": "PASS",
+        "details": "insertion order does not change the bytes"
+      },
+      {
+        "section": "reproducibility",
+        "name": "unicode_normalised",
+        "status": "PASS",
+        "details": "NFC-equivalent strings hash alike"
+      },
+      {
+        "section": "reproducibility",
+        "name": "floats_rejected",
+        "status": "PASS",
+        "details": "raw floats are refused; values are decimal strings"
+      },
+      {
+        "section": "reproducibility",
+        "name": "copied_bundle_verifies",
+        "status": "PASS",
+        "details": "a copied bundle produces the same fingerprint"
+      },
+      {
+        "section": "reproducibility",
+        "name": "historical_bundles_verify",
+        "status": "PASS",
+        "details": "198/198 bundles still verify locally",
+        "total": 198,
+        "failed": 0
+      }
+    ]
+  },
+  "artifacts": {
+    "bundle": "evidence/TRACE-20260903-FC24B6",
+    "healthcheck_json": "final/healthcheck.json",
+    "junit_xml": "final/junit.xml",
+    "report": "final_report.json"
+  },
+  "final_verdict": {
+    "status": "READY_FOR_SUBMISSION",
+    "checks_passed": 418,
+    "checks_failed": 0,
+    "blocking_issues": [],
+    "warnings": [
+      "dns_not_covered_by_socket_timeouts: getaddrinfo is an OS call that connect/read timeouts do not bound; an unresponsive resolver has been observed to extend one candidate to ~83s. Correctness is unaffected - the candidate is classified FETCH_FAILED and the run continues - but a stage can run long."
+    ]
+  }
+}

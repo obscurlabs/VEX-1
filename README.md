@@ -5,8 +5,7 @@ search, candidate images are independently re-matched locally, and the
 resulting evidence bundle is fingerprinted and anchored on Polygon Amoy so its
 integrity can be re-verified later.
 
-> **Status: Phases 0-6 complete.** One command runs the whole pipeline live,
-> from face scan to on-chain verification, in about 45 seconds.
+> **Status: complete and validated.** Every stage runs live: real Google Lens discovery, real candidate retrieval, real face matching, a deterministic evidence fingerprint anchored on Polygon Amoy, and independent on-chain verification with tamper detection.
 
 ## Pipeline
 
@@ -16,7 +15,7 @@ input image → face detection → ArcFace embedding → reverse image search
   → evidence bundle → SHA-256 → Polygon Amoy → re-verification
 ```
 
-## What Phase 0 covers
+## Local face pipeline
 
 ```text
 input image
@@ -71,7 +70,7 @@ are present in any current InsightFace pack.
 Only the `detection` and `recognition` modules are loaded; the gender/age and
 landmark models in the pack are skipped since nothing here uses them.
 
-## Live discovery (Phase 1)
+## Live discovery
 
 ```bash
 python main.py --image inputs/target.jpg --mode live
@@ -119,6 +118,15 @@ separately, so a single value of N actually bounds a request at ~2N. A live
 run hit exactly that — a 15 s setting produced a 30 s stall — which is why
 `RETRIEVAL_CONNECT_TIMEOUT` and `RETRIEVAL_READ_TIMEOUT` are separate.
 
+**Those timeouts bound the sockets, not DNS.** `getaddrinfo` is a blocking OS
+call, so an unresponsive resolver can hold a single candidate far longer — a
+live run on 2026-09-03 recorded five candidates at ~83 s each during a
+transient DNS outage, against an 18 s socket bound. Correctness is unaffected:
+each was classified `FETCH_FAILED`, isolation held, and the run completed and
+verified on chain. The cost is latency — that run took 105 s instead of the
+usual ~30 s. Bounding this properly needs a resolver with its own timeout,
+which is not worth the dependency here.
+
 ### Artifacts
 
 Each run writes `evidence/TRACE-YYYYMMDD-XXXXXX/`:
@@ -133,7 +141,7 @@ matching.json          threshold, distribution, per-face similarities,
                        selected match and best independent match
 ```
 
-## Face matching (Phase 2)
+## Face matching
 
 Each retrieved candidate is scored independently against the target
 embedding:
@@ -210,7 +218,7 @@ reported as `[SAME FILE AS INPUT]`. That locates the source but is **not**
 independent corroboration, so the run also reports `best_independent`: the
 highest-scoring match that is a genuinely different file.
 
-## Evidence bundle (Phase 3)
+## Evidence bundle
 
 ```text
 evidence/TRACE-YYYYMMDD-XXXXXX/
@@ -274,7 +282,7 @@ on-disk digest must match the manifest, and re-canonicalizing `manifest.json`
 must reproduce the recorded `evidence_sha256`. Exit 0 = `VERIFIED`, 1 =
 `FAILED`.
 
-## Blockchain anchoring (Phase 4)
+## Blockchain anchoring
 
 `contracts/IdentityAnchor.sol` — 975 bytes deployed, solc 0.8.26, optimizer on
 (200 runs), EVM `paris`.
@@ -310,7 +318,7 @@ python anchor.py evidence/TRACE-20260902-F53AF4 --verify-only   # no transaction
 `anchor.py` recomputes the fingerprint from the bundle on disk, refuses to
 anchor a bundle that does not verify locally, sends the transaction, waits for
 a real receipt, reads the hash back, and compares. `anchor.json` is written
-into the bundle but is **not** covered by the Phase 3 fingerprint — the anchor
+into the bundle but is **not** covered by the evidence fingerprint — the anchor
 references the evidence, never the other way round.
 
 ### Safety
@@ -326,7 +334,7 @@ success, and never re-broadcast.
 Polygon is proof-of-authority, so `ExtraDataToPOAMiddleware` is required;
 without it every `get_block()` fails on the 105-byte `extraData`.
 
-## End-to-end verification (Phase 5)
+## End-to-end verification
 
 ```bash
 python verify_chain.py evidence/TRACE-20260902-F53AF4
@@ -430,9 +438,18 @@ produce. The CLI remains the primary interface.
 ### Before the demo
 
 ```bash
-python preflight.py            # checks everything; sends no search, no transaction
+python preflight.py            # is the environment ready for a live run?
 python preflight.py --offline  # skip the network checks
+
+python healthcheck.py          # full audit: 78 checks, read-only, costs nothing
+python healthcheck.py --json final/healthcheck.json
+python healthcheck.py --section evidence --section blockchain
 ```
+
+`preflight.py` answers "can I run now?". `healthcheck.py` answers "is every
+claim this project makes still true?" — it re-verifies evidence integrity,
+tamper detection, chain reads, secret hygiene and hash determinism without
+spending a search or sending a transaction.
 
 ### Independent verification
 
@@ -476,6 +493,23 @@ before spending gas. A normal run generates a fresh investigation id and
 anchors once. Re-running `anchor.py` on an already-anchored bundle prints
 `already anchored; skipping the write`, sends **no** transaction, and still
 verifies against the chain. No transaction is ever sent for visual effect.
+
+## Recording the demo
+
+Four commands, in order. Every value shown comes from the run in front of you.
+
+```bat
+.venv\Scripts\activate
+
+python preflight.py
+python main.py --image inputs/demo-target.jpg --mode live
+python verify_chain.py evidence\TRACE-<id-from-the-run>
+python scripts\tamper_chain_demo.py evidence\TRACE-<id-from-the-run>
+```
+
+Copy the investigation ID out of the RESULT block of the second command.
+A live run takes roughly 30 seconds. `verify_chain.py` needs no private key,
+so it demonstrates that anyone holding the bundle can check it independently.
 
 ## Tests
 
