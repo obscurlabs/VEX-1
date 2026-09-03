@@ -65,11 +65,14 @@ from src.pipeline import (
     EXIT_SEARCH_AUTH,
     EXIT_SEARCH_LIMIT,
     EXIT_VERIFY,
+    RunResult,
     counts,
     fail,
     header,
     info,
+    line,
     ok,
+    result as report_result,
     stage,
     summary,
     verdict,
@@ -132,10 +135,10 @@ def run(args: argparse.Namespace) -> int:
     live = args.mode == "live"
 
     header(TITLE)
-    print(f"  MODE: {args.mode.upper()}"
-          + ("" if live else "   ** REPLAYING A SAVED RESPONSE - NOT LIVE **"))
-    print(f"  investigation: {investigation_id}")
-    print(f"  started:       {started_at}")
+    line(f"  MODE: {args.mode.upper()}"
+         + ("" if live else "   ** REPLAYING A SAVED RESPONSE - NOT LIVE **"))
+    line(f"  investigation: {investigation_id}")
+    line(f"  started:       {started_at}")
 
     store = ArtifactStore(investigation_id)
 
@@ -485,11 +488,24 @@ def _final_summary(investigation_id, match, digest, receipt, check, store, start
             ("on-chain hash", check.on_chain_sha256),
             ("local == on-chain", "YES" if check.verified else "NO"),
         ]
+    elapsed = time.perf_counter() - started
     rows += [
         ("evidence bundle", store.relative(store.root)),
-        ("elapsed", f"{time.perf_counter() - started:.1f}s"),
+        ("elapsed", f"{elapsed:.1f}s"),
     ]
     summary(rows, title="RESULT")
+
+    # Structured mirror of the block above, for front ends that should not
+    # have to re-parse formatted text. Carries only state already computed.
+    report_result(RunResult(
+        investigation_id=investigation_id,
+        evidence_sha256=digest,
+        bundle_path=store.relative(store.root),
+        elapsed_seconds=elapsed,
+        match=match,
+        receipt=receipt,
+        verification=check,
+    ))
 
 
 def main() -> int:
@@ -511,7 +527,7 @@ def main() -> int:
     try:
         return run(args)
     except KeyboardInterrupt:
-        print()
+        line()
         fail("interrupted by user")
         info("no partial result is reported as successful")
         return 130

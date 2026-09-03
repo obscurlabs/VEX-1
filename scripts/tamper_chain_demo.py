@@ -12,8 +12,6 @@ end to prove it.
 """
 from __future__ import annotations
 
-import json
-import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -25,8 +23,8 @@ from src.bootstrap import require_dependencies  # noqa: E402
 require_dependencies()
 
 from src.blockchain.verifier import verify_against_chain  # noqa: E402
-from src.evidence import hashing  # noqa: E402
 from src.evidence.collector import MANIFEST_FILE  # noqa: E402
+from src.tamper import CASES  # noqa: E402
 
 BAR = "=" * 74
 
@@ -74,90 +72,19 @@ def main() -> int:
 
     failures = 0
     with tempfile.TemporaryDirectory() as tmp:
-        # Two independent detection layers, and a case is expected to trip a
-        # specific one:
-        #   "manifest" - the manifest itself changed, so its SHA-256 changed
-        #                and no longer matches the anchored value
-        #   "artifact" - a covered file changed while the manifest did not.
-        #                The manifest hash is UNCHANGED by design; detection
-        #                comes from the per-artifact digests the manifest
-        #                carries. Expecting the hash to move here would be
-        #                wrong.
-        cases: list[tuple[str, str, callable]] = []
-
-        def case(name, layer):
-            def deco(fn):
-                cases.append((name, layer, fn))
-                return fn
-            return deco
-
-        @case("one digit changed in the manifest", "manifest")
-        def _(dest: Path) -> str:
-            manifest = json.loads((dest / MANIFEST_FILE).read_bytes().decode("utf-8"))
-            node = manifest["matching"]["best_independent_match"]
-            before = node["similarity"]
-            node["similarity"] = before[:-1] + str((int(before[-1]) + 1) % 10)
-            (dest / MANIFEST_FILE).write_bytes(hashing.canonical_bytes(manifest))
-            return f"similarity {before} -> {node['similarity']}"
-
-        @case("source URL changed in the manifest", "manifest")
-        def _(dest: Path) -> str:
-            manifest = json.loads((dest / MANIFEST_FILE).read_bytes().decode("utf-8"))
-            node = manifest["matching"]["best_independent_match"]
-            before = node["source_url"]
-            node["source_url"] = "https://attacker.example/substituted"
-            (dest / MANIFEST_FILE).write_bytes(hashing.canonical_bytes(manifest))
-            return f"{before[:44]}... -> attacker.example"
-
-        @case("candidate image byte flipped", "artifact")
-        def _(dest: Path) -> str:
-            img = dest / "source-image.jpg"
-            data = bytearray(img.read_bytes())
-            data[-1] ^= 0xFF
-            img.write_bytes(bytes(data))
-            return "last byte of source-image.jpg XOR 0xFF"
-
-        @case("raw search response altered", "artifact")
-        def _(dest: Path) -> str:
-            path = dest / "search-response.json"
-            data = path.read_bytes().replace(b'"position": 1', b'"position": 9', 1)
-            path.write_bytes(data)
-            return "one position field rewritten"
-
-        @case("artifact deleted", "artifact")
-        def _(dest: Path) -> str:
-            (dest / "input.jpg").unlink()
-            return "input.jpg removed"
-
-        @case("manifest digest updated to cover a modified artifact", "manifest")
-        def _(dest: Path) -> str:
-            # The sophisticated attempt: change an artifact AND fix the
-            # manifest so local self-consistency is restored. The chain still
-            # catches it, because the manifest hash changed.
-            img = dest / "source-image.jpg"
-            data = bytearray(img.read_bytes())
-            data[-1] ^= 0xFF
-            img.write_bytes(bytes(data))
-            manifest = json.loads((dest / MANIFEST_FILE).read_bytes().decode("utf-8"))
-            manifest["artifacts"]["source-image.jpg"] = {
-                "sha256": hashing.sha256_file(img),
-                "bytes": img.stat().st_size,
-            }
-            (dest / MANIFEST_FILE).write_bytes(hashing.canonical_bytes(manifest))
-            return "image altered AND manifest digest re-signed"
-
-        for i, (name, layer, mutate) in enumerate(cases, start=1):
+        # Case definitions live in src/tamper.py so the GUI panel can run the
+        # same demonstrations without redefining them.
+        for i, case in enumerate(CASES, start=1):
             dest = Path(tmp) / f"case{i}"
-            shutil.copytree(original, dest)
-            detail = mutate(dest)
-            print(f"  CASE {i} - {name}  [{layer} layer]")
+            detail = case.apply_to_copy(original, dest)
+            print(f"  CASE {i} - {case.name}  [{case.layer} layer]")
             print(f"    change: {detail}")
             r = show("tampered copy", dest, contract)
 
             if r.verified:
                 print("    *** TAMPERED BUNDLE STILL VERIFIED ***")
                 failures += 1
-            elif layer == "manifest":
+            elif case.expects_hash_change:
                 if r.local_sha256 == anchored_hash:
                     print("    *** MANIFEST CHANGED BUT ITS HASH DID NOT ***")
                     failures += 1
