@@ -87,8 +87,8 @@ def test_all_stages_start_pending(window):
 
 
 def test_result_panel_starts_empty(window):
-    assert "No investigation" in window.result_panel.headline()
-    assert window.result_panel.value_of("similarity") == "—"
+    assert "NO INVESTIGATION" in window.result_panel.headline()
+    assert window.result_panel.summary.similarity_text() == "—"
     assert window.result_panel.value_of("transaction") == "—"
 
 
@@ -262,7 +262,9 @@ def test_counts_are_expanded_into_the_log(qtbot):
     panel = LogPanel()
     qtbot.addWidget(panel)
     panel.append_counts({"RETRIEVED": 19, "INVALID_IMAGE": 6}, skip="RETRIEVED")
-    assert [r[1].split()[0] for r in panel.records] == ["INVALID_IMAGE"]
+    assert len(panel.records) == 1
+    assert "invalid image" in panel.records[0][1]
+    assert "6" in panel.records[0][1]
 
 
 def test_reporter_emits_exactly_what_it_was_given(qtbot):
@@ -300,7 +302,7 @@ def test_result_panel_shows_absent_values_honestly(qtbot):
     assert panel.value_of("transaction") == UNAVAILABLE
     assert panel.value_of("block") == UNAVAILABLE
     assert panel.value_of("verification") == UNAVAILABLE
-    assert "Evidence fingerprint ready" in panel.headline()
+    assert "EVIDENCE FINGERPRINT READY" in panel.headline()
 
 
 def test_result_panel_never_shows_a_verified_badge_without_verification(qtbot):
@@ -308,7 +310,7 @@ def test_result_panel_never_shows_a_verified_badge_without_verification(qtbot):
     qtbot.addWidget(panel)
     panel.show_result(RunResult("T", "c" * 64, "evidence/T", 1.0,
                                 verification=_fake_chain_verification(False)))
-    assert "VERIFIED" not in panel.headline() or panel.headline().startswith("✗")
+    assert panel.headline() != "BLOCKCHAIN VERIFIED"
     assert panel.value_of("verification") == "HASH_MISMATCH"
 
 
@@ -317,7 +319,7 @@ def test_result_panel_shows_verified_only_when_the_pipeline_says_so(qtbot):
     qtbot.addWidget(panel)
     panel.show_result(RunResult("T", "d" * 64, "evidence/T", 1.0,
                                 verification=_fake_chain_verification(True)))
-    assert panel.headline() == "✓ BLOCKCHAIN VERIFIED"
+    assert panel.headline() == "BLOCKCHAIN VERIFIED"
 
 
 def test_result_panel_renders_a_real_match_object(qtbot):
@@ -332,9 +334,10 @@ def test_result_panel_renders_a_real_match_object(qtbot):
     panel = ResultPanel()
     qtbot.addWidget(panel)
     panel.show_result(RunResult("T", "e" * 64, "evidence/T", 2.0, match=match))
-    assert panel.value_of("similarity") == "0.989948"
-    assert panel.value_of("domain") == "news.example"
-    assert panel.value_of("match status") == "MATCH"
+    assert panel.summary.similarity_text() == "0.9899"
+    assert panel.summary.status_text() == "MATCH"
+    assert panel.source.domain_text() == "news.example"
+    assert panel.value_of("threshold") == "0.30"
 
 
 def test_result_panel_has_no_hardcoded_values():
@@ -565,3 +568,246 @@ def test_gui_never_reads_env_directly():
 def test_console_reporter_is_still_the_default_after_gui_import():
     """Importing the GUI must not install a reporter globally."""
     assert isinstance(pipeline.active_reporter(), pipeline.ConsoleReporter)
+
+
+# --- 7.C presentation guarantees ---------------------------------------
+
+def test_similarity_is_never_shown_as_a_percentage(qtbot):
+    """Spec rule: a cosine similarity is not a probability. 0.9534, not 95.34%."""
+    from src.models import CandidateMatch, CandidateStatus, SearchCandidate
+
+    candidate = SearchCandidate(url="https://a.example/x", title="t",
+                                source_domain="a.example", image_url=None,
+                                thumbnail_url=None, position=1, provider="google_lens")
+    match = CandidateMatch(candidate=candidate, status=CandidateStatus.MATCH,
+                           best_similarity=0.9534, threshold=0.30)
+    panel = ResultPanel()
+    qtbot.addWidget(panel)
+    panel.show_result(RunResult("T", "f" * 64, "evidence/T", 1.0, match=match))
+
+    shown = panel.summary.similarity_text()
+    assert "%" not in shown
+    assert shown == "0.9534"
+
+
+def test_no_gui_source_presents_similarity_as_a_probability():
+    """Only affirmative framings are banned; the source may say what it is NOT."""
+    banned = ("% likely", "% probability", "probability this", "probability that",
+              "match confidence", "confidence score", "% match", "% similar")
+    for path in (ROOT / "gui").rglob("*.py"):
+        text = path.read_text(encoding="utf-8").lower()
+        for phrase in banned:
+            assert phrase not in text, f"{path.name} frames similarity as {phrase!r}"
+
+
+def test_similarity_labels_say_cosine_not_score():
+    """The caption must name the measure, so nobody reads it as a percentage."""
+    src = (ROOT / "gui" / "widgets" / "result_panel.py").read_text(encoding="utf-8")
+    assert "COSINE SIMILARITY" in src
+    assert "not a probability" in src
+
+
+def test_stage_durations_are_measured_not_predicted(qtbot):
+    """A stage has no duration until it has actually started and ended."""
+    from gui.widgets.stage_list import StageList
+
+    stages = StageList()
+    qtbot.addWidget(stages)
+    assert stages.duration_of("01") is None
+
+    stages.advance("01")
+    assert stages.duration_of("01") is None, "still running: no duration yet"
+
+    qtbot.wait(30)
+    stages.advance("02")
+    measured = stages.duration_of("01")
+    assert measured is not None and measured > 0
+    assert stages.duration_of("02") is None
+
+
+def test_unreached_stages_never_get_a_duration(qtbot):
+    from gui.widgets.stage_list import StageList
+
+    stages = StageList()
+    qtbot.addWidget(stages)
+    stages.advance("01")
+    stages.finish(0)
+    for number in ("02", "03", "04", "05", "06", "07"):
+        assert stages.duration_of(number) is None
+
+
+def test_stage_counter_reflects_completed_stages_only(qtbot):
+    from gui.widgets.stage_list import StageBoard
+
+    board = StageBoard()
+    qtbot.addWidget(board)
+    assert board.counter_text() == "0 / 7"
+
+    board.list.advance("01")
+    board.refresh_counter()
+    assert board.counter_text() == "0 / 7", "running is not completed"
+
+    board.list.advance("02")
+    board.refresh_counter()
+    assert board.counter_text() == "1 / 7"
+
+
+def test_source_card_uses_the_real_retrieved_image(qtbot):
+    """The thumbnail is the bytes the pipeline downloaded, not a stock image."""
+    from src.models import (
+        CandidateMatch, CandidateResult, CandidateStatus, SearchCandidate,
+    )
+
+    img = np.zeros((60, 60, 3), dtype=np.uint8)
+    img[:, :] = (10, 200, 90)
+    encoded = cv2.imencode(".png", img)[1].tobytes()
+
+    candidate = SearchCandidate(url="https://a.example/x", title="t",
+                                source_domain="a.example", image_url=None,
+                                thumbnail_url=None, position=3, provider="google_lens")
+    retrieval = CandidateResult(candidate=candidate)
+    retrieval.status = CandidateStatus.RETRIEVED
+    retrieval.content = encoded
+    retrieval.bytes_downloaded = len(encoded)
+    match = CandidateMatch(candidate=candidate, status=CandidateStatus.MATCH,
+                           best_similarity=0.88, threshold=0.30, retrieval=retrieval)
+
+    panel = ResultPanel()
+    qtbot.addWidget(panel)
+    panel.show_result(RunResult("T", "a" * 64, "evidence/T", 1.0, match=match))
+    assert panel.source.has_thumbnail(), "the matched image should be displayed"
+
+
+def test_source_card_has_no_thumbnail_without_retrieved_bytes(qtbot):
+    from src.models import CandidateMatch, CandidateStatus, SearchCandidate
+
+    candidate = SearchCandidate(url="https://a.example/x", title="t",
+                                source_domain="a.example", image_url=None,
+                                thumbnail_url=None, position=1, provider="google_lens")
+    match = CandidateMatch(candidate=candidate, status=CandidateStatus.MATCH,
+                           best_similarity=0.88, threshold=0.30)
+    panel = ResultPanel()
+    qtbot.addWidget(panel)
+    panel.show_result(RunResult("T", "a" * 64, "evidence/T", 1.0, match=match))
+    assert not panel.source.has_thumbnail()
+
+
+def test_identical_to_input_is_flagged_in_the_source_card(qtbot):
+    from src.models import CandidateMatch, CandidateStatus, SearchCandidate
+
+    candidate = SearchCandidate(url="https://a.example/x", title="t",
+                                source_domain="a.example", image_url=None,
+                                thumbnail_url=None, position=1, provider="google_lens")
+    match = CandidateMatch(candidate=candidate, status=CandidateStatus.MATCH,
+                           best_similarity=1.0, threshold=0.30,
+                           identical_to_input=True)
+    panel = ResultPanel()
+    qtbot.addWidget(panel)
+    panel.show_result(RunResult("T", "a" * 64, "evidence/T", 1.0, match=match))
+    assert "not independent corroboration" in panel.source._flag.text()
+
+
+def test_technical_details_are_collapsed_by_default(qtbot):
+    """Progressive disclosure: verdict first, hashes on request."""
+    panel = ResultPanel()
+    qtbot.addWidget(panel)
+    assert panel.details.expanded is False
+    panel.details.toggle()
+    assert panel.details.expanded is True
+
+
+def test_face_card_reports_only_what_the_pipeline_said(qtbot, window):
+    from gui.reporter import QtReporter
+
+    assert "awaiting" in window.face_card.headline()
+    reporter = QtReporter()
+    reporter.stageStarted.connect(window._on_stage)
+    reporter.okReceived.connect(window._on_ok)
+
+    reporter.stage("01", "FACE SCAN")
+    reporter.ok("1 face detected (313x431px, confidence 0.917)")
+    assert "1 face detected" in window.face_card.headline()
+    assert "0.917" in window.face_card.headline()
+
+
+def test_multiple_face_match_is_described_honestly(qtbot):
+    from src.models import CandidateMatch, CandidateStatus, SearchCandidate
+
+    candidate = SearchCandidate(url="https://a.example/x", title="t",
+                                source_domain="a.example", image_url=None,
+                                thumbnail_url=None, position=1, provider="google_lens")
+    match = CandidateMatch(candidate=candidate,
+                           status=CandidateStatus.MULTIPLE_FACE_MATCH,
+                           best_similarity=0.79, threshold=0.30, faces_detected=3)
+    panel = ResultPanel()
+    qtbot.addWidget(panel)
+    panel.show_result(RunResult("T", "a" * 64, "evidence/T", 1.0, match=match))
+    note = panel.summary._status_note.text()
+    assert "one of 3 faces" in note
+    assert "the image as a whole does not" in note
+
+
+def test_investigation_id_comes_from_the_result_not_the_gui(qtbot, window):
+    """The header shows the pipeline's id, never one the GUI made up."""
+    assert window.investigation_label.text() == "\u2014"
+    window._on_result(RunResult("TRACE-20260903-ABCDEF", "a" * 64, "evidence/x", 1.0))
+    assert window.investigation_label.text() == "TRACE-20260903-ABCDEF"
+
+
+def test_no_image_editing_controls_exist():
+    """The searched bytes must be the supplied bytes: the input SHA-256 is
+    what the evidence anchors, so no crop/rotate/filter/enhance is offered."""
+    banned = ("crop", "rotate", "brightness", "saturation", "enhance", "filter")
+    for path in (ROOT / "gui").rglob("*.py"):
+        if path.name == "drop_zone.py":
+            continue                      # its docstring explains the absence
+        text = path.read_text(encoding="utf-8").lower()
+        for word in banned:
+            assert word not in text, f"{path.name} offers image editing: {word}"
+
+
+def test_hash_is_grouped_for_reading_but_copied_exactly(qtbot):
+    """Grouping a digest into blocks is a display convention. The value the
+    copy button yields, and the one tests read, must be the exact digest."""
+    from gui.widgets.result_panel import DetailRow
+
+    digest = "507b717a837dee6c27cdd96b1d82d2be92a07bc36855a3e654b885d8db37104d"
+    row = DetailRow("evidence SHA-256")
+    qtbot.addWidget(row)
+    row.set_value(digest, copyable=True)
+
+    assert row.text() == digest, "the exact value must be recoverable"
+    assert row._value.text() != digest, "the display is grouped for reading"
+    assert row._value.text().replace(" ", "") == digest, "grouping adds only spaces"
+
+
+def test_short_values_are_not_regrouped(qtbot):
+    from gui.widgets.result_panel import DetailRow
+
+    row = DetailRow("block")
+    qtbot.addWidget(row)
+    row.set_value("46599932")
+    assert row._value.text() == "46599932"
+
+
+def test_bundle_paths_are_not_treated_as_digests(qtbot):
+    from gui.widgets.result_panel import DetailRow
+
+    row = DetailRow("evidence bundle")
+    qtbot.addWidget(row)
+    row.set_value("evidence/TRACE-20260903-DAF282")
+    assert row._value.text() == "evidence/TRACE-20260903-DAF282"
+
+
+def test_long_values_wrap_instead_of_widening_the_column(qtbot):
+    """A 64-character hash has no spaces to wrap at; without heightForWidth it
+    would be clipped rather than wrapped."""
+    from gui.widgets.result_panel import DetailRow
+
+    row = DetailRow("evidence SHA-256")
+    qtbot.addWidget(row)
+    row.set_value("a" * 64)
+    policy = row._value.sizePolicy()
+    assert policy.hasHeightForWidth()
+    assert row._value.wordWrap()
+    assert row._value.maximumWidth() < 300
