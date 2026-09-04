@@ -811,3 +811,147 @@ def test_long_values_wrap_instead_of_widening_the_column(qtbot):
     assert policy.hasHeightForWidth()
     assert row._value.wordWrap()
     assert row._value.maximumWidth() < 300
+
+
+# --- independent sources list -------------------------------------------
+
+def _group(url, domain, similarity, position, duplicates=0, faces=1,
+           size=(600, 400), status=None):
+    from src.models import (CandidateMatch, CandidateResult, CandidateStatus,
+                            MatchGroup, SearchCandidate)
+
+    candidate = SearchCandidate(
+        url=url, title="t", source_domain=domain, image_url=None,
+        thumbnail_url=None, position=position, provider="google_lens")
+    retrieval = CandidateResult(candidate=candidate,
+                                status=CandidateStatus.RETRIEVED)
+    retrieval.bytes_downloaded = 4096
+    match = CandidateMatch(
+        candidate=candidate,
+        status=status or CandidateStatus.MATCH,
+        best_similarity=similarity, threshold=0.30, faces_detected=faces,
+        best_face_index=0, image_size=size, retrieval=retrieval)
+    return MatchGroup(
+        representative=match, key=f"domain:{domain}",
+        duplicates=[(match, "same source domain")] * duplicates)
+
+
+def _panel_with(qtbot, groups):
+    panel = ResultPanel()
+    qtbot.addWidget(panel)
+    panel.show_result(RunResult("T", "e" * 64, "evidence/T", 2.0,
+                                match=groups[0].representative if groups else None,
+                                ranked=groups))
+    return panel
+
+
+LONG_URL = ("https://www.hellomagazine.com/celebrities/736617/"
+            "meet-a-surprisingly-normal-family-of-three-children/")
+
+
+def test_every_listed_source_url_is_complete(qtbot):
+    """A truncated URL reads as a whole one - none may be elided."""
+    groups = [_group(LONG_URL, "hellomagazine.com", 0.83, 1)]
+    panel = _panel_with(qtbot, groups)
+    assert panel.sources.urls_shown() == [LONG_URL]
+    assert "…" not in panel.sources.urls_shown()[0]
+
+
+def test_each_source_is_openable_and_emits_its_own_url(qtbot):
+    groups = [_group(f"https://s{i}.example/page", f"s{i}.example", 0.9 - i / 100, i)
+              for i in range(1, 4)]
+    panel = _panel_with(qtbot, groups)
+
+    opened = []
+    panel.openSourceRequested.connect(opened.append)
+    assert len(panel.sources.openable_urls()) == 3
+
+    panel.sources._rows[2].click_open()
+    assert opened == ["https://s3.example/page"]
+
+
+def test_a_source_without_a_url_cannot_be_opened(qtbot):
+    panel = _panel_with(qtbot, [_group("", "unknown", 0.9, 1)])
+    assert panel.sources.openable_urls() == []
+
+
+def test_view_all_expands_to_every_source_and_back(qtbot):
+    groups = [_group(f"https://s{i}.example/p", f"s{i}.example", 0.9, i)
+              for i in range(1, 13)]
+    panel = _panel_with(qtbot, groups)
+    card = panel.sources
+
+    assert card.source_count() == 12
+    assert card.rows_shown() == card.MAX_SHOWN
+    assert not card.is_expanded()
+
+    card.toggle()
+    assert card.is_expanded()
+    assert card.rows_shown() == 12
+    assert len(card.openable_urls()) == 12
+
+    card.toggle()
+    assert card.rows_shown() == card.MAX_SHOWN
+
+
+def test_toggle_appears_only_when_sources_are_hidden(qtbot):
+    """isVisibleTo, not isVisible: offscreen every widget is invisible, so
+    isVisible() would pass this test even if the toggle were always shown."""
+    few = _panel_with(qtbot, [_group("https://a.example/p", "a.example", 0.9, 1)])
+    assert few.sources.rows_shown() == 1
+    assert not few.sources._toggle.isVisibleTo(few.sources)
+
+    many = _panel_with(qtbot, [
+        _group(f"https://s{i}.example/p", f"s{i}.example", 0.9, i)
+        for i in range(1, 13)])
+    assert many.sources._toggle.isVisibleTo(many.sources)
+    assert "View all 12" in many.sources._toggle.text()
+    many.sources.toggle()
+    assert "Show top 5" in many.sources._toggle.text()
+
+
+def test_rank_figures_come_from_the_match_object(qtbot):
+    groups = [_group("https://a.example/p", "a.example", 0.912345, 7,
+                     duplicates=2, faces=3, size=(1080, 1080))]
+    panel = _panel_with(qtbot, groups)
+    row = panel.sources._rows[0]
+
+    assert row.rank_text() == "#1"
+    assert row.score_text() == "0.912345"
+    figures = row.figures()
+    assert "face 1 of 3" in figures
+    assert "threshold 0.30" in figures
+    assert "1080 × 1080 px" in figures
+    assert "search position 7" in figures
+    assert "+2 duplicates grouped" in figures
+
+
+def test_absent_runner_up_is_shown_as_absent_not_zero(qtbot):
+    panel = _panel_with(qtbot, [_group("https://a.example/p", "a.example", 0.9, 1)])
+    figures = panel.sources._rows[0].figures()
+    assert "runner-up —" in figures
+    assert "runner-up 0.0" not in figures
+
+
+def test_sources_list_is_empty_without_a_ranked_set(qtbot):
+    panel = ResultPanel()
+    qtbot.addWidget(panel)
+    panel.show_result(RunResult("T", "e" * 64, "evidence/T", 2.0))
+    assert panel.sources.source_count() == 0
+    assert panel.sources.rows_shown() == 0
+
+
+def test_sources_reset_between_runs(qtbot):
+    panel = _panel_with(qtbot, [_group("https://a.example/p", "a.example", 0.9, 1)])
+    assert panel.sources.rows_shown() == 1
+    panel.reset()
+    assert panel.sources.rows_shown() == 0
+    assert panel.sources.source_count() == 0
+
+
+def test_source_figures_never_present_similarity_as_a_percentage(qtbot):
+    groups = [_group("https://a.example/p", "a.example", 0.912345, 1)]
+    panel = _panel_with(qtbot, groups)
+    row = panel.sources._rows[0]
+    assert "%" not in row.score_text()
+    assert "%" not in row.figures()

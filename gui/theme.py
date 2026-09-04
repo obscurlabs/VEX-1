@@ -221,6 +221,17 @@ QLabel#SourceUrl    {{ color: {TEXT_FAINT}; font-family: {MONO}; font-size: 10px
 QLabel#SourceMeta   {{ color: {TEXT_FAINT}; font-family: {MONO}; font-size: 10px; }}
 QLabel#SourceFlag   {{ color: {WARN}; font-size: 10px; font-weight: 700; }}
 
+QFrame#SourceRow {{ border: none; border-top: 1px solid {BORDER_SOFT}; }}
+QFrame#SourceRow[first="true"] {{ border-top: none; }}
+QLabel#SourceRank   {{ color: {TEXT_FAINT}; font-family: {MONO}; font-size: 11px;
+                       font-weight: 700; }}
+QLabel#SourceScore  {{ color: {TEXT}; font-family: {MONO}; font-size: 13px;
+                       font-weight: 700; }}
+QLabel#SourceScore[state="reject"] {{ color: {TEXT_FAINT}; }}
+QLabel#SourceStatus {{ color: {GOOD}; font-size: 10px; font-weight: 700; }}
+QLabel#SourceStatus[state="reject"] {{ color: {TEXT_FAINT}; }}
+QLabel#SourceFigures {{ color: {TEXT_FAINT}; font-family: {MONO}; font-size: 10px; }}
+
 QLabel#DetailKey   {{ color: {TEXT_FAINT}; font-size: 10px; }}
 QLabel#DetailValue {{ color: {TEXT}; font-family: {MONO}; font-size: 10px; }}
 QLabel#DetailValue[state="good"] {{ color: {GOOD}; }}

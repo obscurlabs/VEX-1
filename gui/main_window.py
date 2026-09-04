@@ -173,6 +173,20 @@ class MainWindow(QWidget):
         self.drop_zone = DropZone()
         self.drop_zone.imageSelected.connect(self._on_image_selected)
         self.drop_zone.imageRejected.connect(self._on_image_rejected)
+        self.drop_zone.imageCleared.connect(self._on_image_cleared)
+
+        self.clear_image_button = QPushButton("Clear image")
+        self.clear_image_button.setObjectName("Ghost")
+        self.clear_image_button.setEnabled(False)
+        self.clear_image_button.setToolTip(
+            "Forget the selected image. The file itself is untouched and no "
+            "existing evidence is affected.")
+        self.clear_image_button.clicked.connect(self.drop_zone.clear)
+
+        clear_row = QHBoxLayout()
+        clear_row.setContentsMargins(0, 0, 0, 0)
+        clear_row.addStretch(1)
+        clear_row.addWidget(self.clear_image_button)
 
         self.face_card = FaceCard()
 
@@ -208,6 +222,7 @@ class MainWindow(QWidget):
             "Per-candidate detail instead of aggregate counts.")
 
         body.addWidget(self.drop_zone)
+        body.addLayout(clear_row)
         body.addWidget(self.face_card)
         body.addLayout(buttons)
         body.addSpacing(2)
@@ -314,12 +329,23 @@ class MainWindow(QWidget):
         self._set_status(f"Rejected: {message}", "failed")
         self._update_controls()
 
+    def _on_image_cleared(self) -> None:
+        self._image = None
+        self._set_status("No image selected")
+        # The face card describes the cleared image's scan, so it goes too.
+        # A completed run's results stay: clearing the input does not retract
+        # evidence that was already produced and anchored.
+        self.face_card.reset()
+        self._update_controls()
+
     def _on_clear_events(self) -> None:
         self.log_panel.clear_log()
 
     def _update_controls(self) -> None:
         self.start_button.setEnabled(self._image is not None and not self._running)
         self.stop_button.setEnabled(self._running)
+        self.clear_image_button.setEnabled(
+            self.drop_zone.path is not None and not self._running)
         self.drop_zone.set_enabled(not self._running)
         for box in (self.diagnostic_check, self.no_chain_check, self.verbose_check):
             box.setEnabled(not self._running)

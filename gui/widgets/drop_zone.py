@@ -50,6 +50,7 @@ class DropZone(QFrame):
 
     imageSelected = Signal(Path)
     imageRejected = Signal(str)
+    imageCleared = Signal()
 
     PREVIEW_HEIGHT = 208
 
@@ -183,18 +184,36 @@ class DropZone(QFrame):
         self.imageSelected.emit(path)
         return True
 
+    def clear(self) -> None:
+        """Drop the selected image and return to the empty state.
+
+        Only forgets the selection - the file on disk is never touched, and no
+        previous run's evidence is affected.
+        """
+        had_image = self._path is not None
+        self._empty("⊕")
+        self.setProperty("state", "")
+        _restyle(self)
+        if had_image:
+            self.imageCleared.emit()
+
     def _reject(self, message: str) -> None:
-        self._path = None
-        self._preview.clear()
-        self._preview.setText("⊘")
-        self._caption.setText("Drop a face image")
-        self._hint.setVisible(True)
-        self._meta.setVisible(False)
+        self._empty("⊘")
         self._error.setText(message)
         self._error.setVisible(True)
         self.setProperty("state", "rejected")
         _restyle(self)
         self.imageRejected.emit(message)
+
+    def _empty(self, mark: str) -> None:
+        """Reset every visual back to 'no image selected'."""
+        self._path = None
+        self._preview.clear()
+        self._preview.setText(mark)
+        self._caption.setText("Drop a face image")
+        self._hint.setVisible(True)
+        self._meta.setVisible(False)
+        self._error.setVisible(False)
 
 
 class FaceCard(QFrame):

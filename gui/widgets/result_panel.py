@@ -546,138 +546,273 @@ class DetailsPanel(QFrame):
         self._rows[field].set_value(text, state, copyable)
 
 
+class SourceRow(QFrame):
+    """One independent source: its rank, its measured figures, its link.
+
+    Every figure is read off the CandidateMatch the pipeline produced. A value
+    the pipeline did not establish is shown as an em dash, never as a zero or
+    a guess.
+    """
+
+    openRequested = Signal(str)
+
+    def __init__(self, position: int, group, first: bool = False,
+                 parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("SourceRow")
+        self.setProperty("first", "true" if first else "false")
+
+        match = group.representative
+        candidate = match.candidate
+        self._url = candidate.url or ""
+        self._position = position
+        rejected = not match.is_match
+
+        self._rank = QLabel(f"#{position}")
+        self._rank.setObjectName("SourceRank")
+        self._rank.setFixedWidth(28)
+
+        similarity = match.best_similarity
+        self._score = QLabel(
+            f"{similarity:.6f}" if similarity is not None else NONE_YET)
+        self._score.setObjectName("SourceScore")
+        self._score.setProperty("state", "reject" if rejected else "")
+
+        self._status = QLabel(match.status.value)
+        self._status.setObjectName("SourceStatus")
+        self._status.setProperty("state", "reject" if rejected else "")
+
+        self._open = QPushButton("Open ↗")
+        self._open.setObjectName("IconButton")
+        self._open.setEnabled(bool(self._url))
+        self._open.setToolTip(self._url or "no URL for this candidate")
+        self._open.clicked.connect(lambda: self.openRequested.emit(self._url))
+
+        head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 0, 0)
+        head.setSpacing(8)
+        head.addWidget(self._rank)
+        head.addWidget(self._score)
+        head.addWidget(self._status)
+        head.addStretch(1)
+        head.addWidget(self._open)
+
+        self._domain = QLabel(candidate.source_domain or NONE_YET)
+        self._domain.setObjectName("SourceTitle")
+        self._domain.setWordWrap(True)
+        _wrapping(self._domain)
+
+        self._url_label = QLabel(self._url)
+        self._url_label.setObjectName("SourceUrl")
+        self._url_label.setWordWrap(True)
+        self._url_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
+        _wrapping(self._url_label)
+
+        self._figures = QLabel(self.figures_text(group, match))
+        self._figures.setObjectName("SourceFigures")
+        self._figures.setWordWrap(True)
+        _wrapping(self._figures)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 8, 0, 0)
+        layout.setSpacing(3)
+        layout.addLayout(head)
+        layout.addWidget(self._domain)
+        layout.addWidget(self._url_label)
+        layout.addWidget(self._figures)
+
+        _restyle(self, self._score, self._status)
+
+    @staticmethod
+    def figures_text(group, match) -> str:
+        """The measured numbers behind this rank, in the pipeline's own terms."""
+        bits: list[str] = []
+
+        if match.faces_detected:
+            index = match.best_face_index
+            which = f"face {index + 1}" if index is not None else "best face"
+            bits.append(f"{which} of {match.faces_detected}")
+        if match.threshold is not None:
+            bits.append(f"threshold {match.threshold:.2f}")
+        bits.append(
+            f"runner-up {match.runner_up_similarity:.6f}"
+            if match.runner_up_similarity is not None else "runner-up —")
+        if match.image_size:
+            bits.append(f"{match.image_size[0]} × {match.image_size[1]} px")
+
+        retrieval = match.retrieval
+        if retrieval is not None and retrieval.bytes_downloaded:
+            bits.append(f"{retrieval.bytes_downloaded / 1024:,.0f} KB")
+
+        bits.append(f"search position {match.candidate.position}")
+        if group.duplicates:
+            n = len(group.duplicates)
+            plural = "s" if n != 1 else ""
+            bits.append(f"+{n} duplicate{plural} grouped")
+        if match.identical_to_input:
+            bits.append("identical to input")
+        return "  ·  ".join(bits)
+
+    # -- inspection (used by tests) -------------------------------------
+
+    def url(self) -> str:
+        return self._url
+
+    def url_text(self) -> str:
+        return self._url_label.text()
+
+    def figures(self) -> str:
+        return self._figures.text()
+
+    def rank_text(self) -> str:
+        return self._rank.text()
+
+    def score_text(self) -> str:
+        return self._score.text()
+
+    def can_open(self) -> bool:
+        return self._open.isEnabled()
+
+    def click_open(self) -> None:
+        self._open.click()
+
+
 class SourcesCard(QFrame):
     """Every independent source the run found, with its full page URL.
 
-    The anchored match is shown above by :class:`SourceCard`; this lists the
-    rest so a reader can see that more than one source corroborated, and can
-    copy any of the URLs. URLs are never elided - a truncated URL reads as a
-    whole one, which is worse than a long line.
+    The anchored match is shown above by :class:`SourceCard`; this lists all
+    of them so a reader can see how many sources corroborated, open any of
+    them, and read the figures behind each rank. URLs are never elided - a
+    truncated URL reads as a whole one, which is worse than a long line.
     """
 
-    #: Mirrors main.TOP_MATCHES so the GUI and the CLI list the same count.
+    openRequested = Signal(str)
+
+    #: Mirrors main.TOP_MATCHES so the collapsed GUI list matches the CLI.
     MAX_SHOWN = 5
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("Panel")
-        self._rows: list[QWidget] = []
-        self._count = 0
+        self._rows: list[SourceRow] = []
+        self._groups: list = []
+        self._expanded = False
 
         self._caption = QLabel("INDEPENDENT SOURCES")
         self._caption.setObjectName("PanelTitle")
+
+        self._toggle = QPushButton("")
+        self._toggle.setObjectName("IconButton")
+        self._toggle.setVisible(False)
+        self._toggle.clicked.connect(self.toggle)
+
+        head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 0, 0)
+        head.addWidget(self._caption)
+        head.addStretch(1)
+        head.addWidget(self._toggle)
 
         self._empty = QLabel(NONE_YET)
         self._empty.setObjectName("SourceMeta")
 
         self._list = QVBoxLayout()
         self._list.setContentsMargins(0, 0, 0, 0)
-        self._list.setSpacing(8)
+        self._list.setSpacing(0)
 
-        self._more = QLabel("")
-        self._more.setObjectName("SourceMeta")
-        self._more.setWordWrap(True)
-        self._more.setVisible(False)
-        _wrapping(self._more)
+        self._note = QLabel("")
+        self._note.setObjectName("SourceMeta")
+        self._note.setWordWrap(True)
+        self._note.setVisible(False)
+        _wrapping(self._note)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(13, 11, 13, 12)
         layout.setSpacing(9)
-        layout.addWidget(self._caption)
+        layout.addLayout(head)
         layout.addWidget(self._empty)
         layout.addLayout(self._list)
-        layout.addWidget(self._more)
+        layout.addWidget(self._note)
 
-    def reset(self) -> None:
+    # -- state ----------------------------------------------------------
+
+    def _clear_rows(self) -> None:
         for row in self._rows:
             self._list.removeWidget(row)
             row.setParent(None)
             row.deleteLater()
         self._rows.clear()
-        self._count = 0
+
+    def reset(self) -> None:
+        self._clear_rows()
+        self._groups = []
+        self._expanded = False
         self._caption.setText("INDEPENDENT SOURCES")
         self._empty.setText(NONE_YET)
         self._empty.setVisible(True)
-        self._more.setVisible(False)
+        self._toggle.setVisible(False)
+        self._note.setVisible(False)
 
     def show_sources(self, groups) -> None:
         """Render the ranked groups the pipeline produced. Never invents one."""
         self.reset()
-        groups = list(groups or [])
-        self._count = len(groups)
-        if not groups:
+        self._groups = list(groups or [])
+        if not self._groups:
             return
 
         self._empty.setVisible(False)
-        self._caption.setText(f"INDEPENDENT SOURCES ({len(groups)})")
+        self._caption.setText(f"INDEPENDENT SOURCES ({len(self._groups)})")
+        self._toggle.setVisible(len(self._groups) > self.MAX_SHOWN)
+        self._render()
 
-        for position, group in enumerate(groups[: self.MAX_SHOWN], start=1):
-            self._list.addWidget(self._row(position, group))
+    def toggle(self) -> None:
+        """Flip between the top few and every source found."""
+        self._expanded = not self._expanded
+        self._render()
 
-        remaining = len(groups) - min(len(groups), self.MAX_SHOWN)
-        if remaining:
-            self._more.setText(
-                f"… {remaining} further independent source"
-                f"{'s' if remaining != 1 else ''} in matching.json")
-            self._more.setVisible(True)
+    def _render(self) -> None:
+        self._clear_rows()
+        total = len(self._groups)
+        shown = self._groups if self._expanded else self._groups[: self.MAX_SHOWN]
 
-    def _row(self, position: int, group) -> QWidget:
-        match = group.representative
-        candidate = match.candidate
+        for offset, group in enumerate(shown):
+            row = SourceRow(offset + 1, group, first=(offset == 0))
+            row.openRequested.connect(self.openRequested)
+            self._list.addWidget(row)
+            self._rows.append(row)
 
-        head = QLabel(self._headline(position, group, match))
-        head.setObjectName("SourceMeta")
-        head.setWordWrap(True)
-        _wrapping(head)
-
-        domain = QLabel(candidate.source_domain or NONE_YET)
-        domain.setObjectName("SourceTitle")
-        domain.setWordWrap(True)
-        _wrapping(domain)
-
-        url = QLabel(candidate.url or "")
-        url.setObjectName("SourceUrl")
-        url.setWordWrap(True)
-        url.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        _wrapping(url)
-
-        row = QWidget()
-        box = QVBoxLayout(row)
-        box.setContentsMargins(0, 0, 0, 0)
-        box.setSpacing(2)
-        box.addWidget(head)
-        box.addWidget(domain)
-        box.addWidget(url)
-
-        self._rows.append(row)
-        return row
-
-    @staticmethod
-    def _headline(position: int, group, match) -> str:
-        similarity = match.best_similarity
-        bits = [f"#{position}"]
-        if similarity is not None:
-            bits.append(f"{similarity:.4f} cosine")
-        bits.append(match.status.value)
-        if group.duplicates:
-            n = len(group.duplicates)
-            bits.append(f"+{n} duplicate{'s' if n != 1 else ''}")
-        return "  ·  ".join(bits)
+        hidden = total - len(shown)
+        if hidden > 0:
+            plural = "s" if hidden != 1 else ""
+            self._note.setText(
+                f"… {hidden} further independent source{plural} not shown "
+                f"— all {total} are in matching.json and the manifest")
+            self._note.setVisible(True)
+            self._toggle.setText(f"View all {total} ↓")
+        else:
+            self._note.setVisible(False)
+            self._toggle.setText(f"Show top {self.MAX_SHOWN} ↑")
 
     # -- inspection (used by tests) -------------------------------------
 
     def source_count(self) -> int:
-        return self._count
+        return len(self._groups)
+
+    def rows_shown(self) -> int:
+        return len(self._rows)
+
+    def is_expanded(self) -> bool:
+        return self._expanded
 
     def urls_shown(self) -> list[str]:
         """Exactly the URL strings on screen, so a test can prove none is cut."""
-        out = []
-        for row in self._rows:
-            for child in row.findChildren(QLabel):
-                if child.objectName() == "SourceUrl":
-                    out.append(child.text())
-                    break
-        return out
+        return [row.url_text() for row in self._rows]
+
+    def openable_urls(self) -> list[str]:
+        return [row.url() for row in self._rows if row.can_open()]
+
+    def figures_shown(self) -> list[str]:
+        return [row.figures() for row in self._rows]
 
 
 class ResultPanel(QWidget):
@@ -693,6 +828,8 @@ class ResultPanel(QWidget):
         self.sources = SourcesCard()
         self.details = DetailsPanel()
         self.source.openRequested.connect(self.openSourceRequested)
+        # Every listed source opens through the same window-level handler.
+        self.sources.openRequested.connect(self.openSourceRequested)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
