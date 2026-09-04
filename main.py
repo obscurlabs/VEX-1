@@ -309,6 +309,9 @@ def run(args: argparse.Namespace) -> int:
                      if group.duplicates else "")
             info(f"  #{position}  {rep.best_similarity:.4f}  "
                  f"{rep.candidate.source_domain:<28} {rep.status.value}{extra}")
+            # The full page URL, on its own line so it is never truncated and
+            # can be copied verbatim. The domain line above stays scannable.
+            info(f"        {rep.candidate.url}")
         remaining = len(ranked_groups) - len(shown)
         if remaining > 0:
             info(f"  … {remaining} further independent source"
@@ -336,6 +339,7 @@ def run(args: argparse.Namespace) -> int:
             same = "  [SAME FILE AS INPUT]" if m.identical_to_input else ""
             info(f"#{i:02d}  {m.best_similarity:.4f}  {m.status.value:<20} "
                  f"{m.candidate.source_domain}{same}")
+            info(f"      {m.candidate.url}")
 
     # ---------------------------------------------------------- [05]
     stage("05", "EVIDENCE")
@@ -418,7 +422,7 @@ def run(args: argparse.Namespace) -> int:
     if args.no_chain:
         info("--no-chain: stopping before the blockchain anchor")
         _final_summary(investigation_id, independent or selected_match, digest,
-                       None, None, store, started)
+                       None, None, store, started, ranked_groups)
         verdict("EVIDENCE FINGERPRINT READY")
         return EXIT_OK
 
@@ -514,15 +518,18 @@ def run(args: argparse.Namespace) -> int:
     })
 
     _final_summary(investigation_id, independent or selected_match, digest,
-                   anchor_receipt, check, store, started)
+                   anchor_receipt, check, store, started, ranked_groups)
     verdict("BLOCKCHAIN VERIFIED")
     return EXIT_OK
 
 
-def _final_summary(investigation_id, match, digest, receipt, check, store, started) -> None:
+def _final_summary(investigation_id, match, digest, receipt, check, store,
+                   started, ranked=None) -> None:
     rows = [
         ("investigation", investigation_id),
-        ("matched source", match.candidate.url[:58]),
+        # Never truncated: a cut URL looks like a whole one, and this is the
+        # value a reader copies out of the recording to check the source.
+        ("matched source", match.candidate.url),
         ("domain", match.candidate.source_domain),
         ("similarity", f"{match.best_similarity:.6f}"),
         ("match status", match.status.value),
@@ -562,6 +569,7 @@ def _final_summary(investigation_id, match, digest, receipt, check, store, start
         match=match,
         receipt=receipt,
         verification=check,
+        ranked=list(ranked or []),
     ))
 
 

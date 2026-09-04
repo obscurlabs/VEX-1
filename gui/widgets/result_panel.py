@@ -546,6 +546,140 @@ class DetailsPanel(QFrame):
         self._rows[field].set_value(text, state, copyable)
 
 
+class SourcesCard(QFrame):
+    """Every independent source the run found, with its full page URL.
+
+    The anchored match is shown above by :class:`SourceCard`; this lists the
+    rest so a reader can see that more than one source corroborated, and can
+    copy any of the URLs. URLs are never elided - a truncated URL reads as a
+    whole one, which is worse than a long line.
+    """
+
+    #: Mirrors main.TOP_MATCHES so the GUI and the CLI list the same count.
+    MAX_SHOWN = 5
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("Panel")
+        self._rows: list[QWidget] = []
+        self._count = 0
+
+        self._caption = QLabel("INDEPENDENT SOURCES")
+        self._caption.setObjectName("PanelTitle")
+
+        self._empty = QLabel(NONE_YET)
+        self._empty.setObjectName("SourceMeta")
+
+        self._list = QVBoxLayout()
+        self._list.setContentsMargins(0, 0, 0, 0)
+        self._list.setSpacing(8)
+
+        self._more = QLabel("")
+        self._more.setObjectName("SourceMeta")
+        self._more.setWordWrap(True)
+        self._more.setVisible(False)
+        _wrapping(self._more)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(13, 11, 13, 12)
+        layout.setSpacing(9)
+        layout.addWidget(self._caption)
+        layout.addWidget(self._empty)
+        layout.addLayout(self._list)
+        layout.addWidget(self._more)
+
+    def reset(self) -> None:
+        for row in self._rows:
+            self._list.removeWidget(row)
+            row.setParent(None)
+            row.deleteLater()
+        self._rows.clear()
+        self._count = 0
+        self._caption.setText("INDEPENDENT SOURCES")
+        self._empty.setText(NONE_YET)
+        self._empty.setVisible(True)
+        self._more.setVisible(False)
+
+    def show_sources(self, groups) -> None:
+        """Render the ranked groups the pipeline produced. Never invents one."""
+        self.reset()
+        groups = list(groups or [])
+        self._count = len(groups)
+        if not groups:
+            return
+
+        self._empty.setVisible(False)
+        self._caption.setText(f"INDEPENDENT SOURCES ({len(groups)})")
+
+        for position, group in enumerate(groups[: self.MAX_SHOWN], start=1):
+            self._list.addWidget(self._row(position, group))
+
+        remaining = len(groups) - min(len(groups), self.MAX_SHOWN)
+        if remaining:
+            self._more.setText(
+                f"… {remaining} further independent source"
+                f"{'s' if remaining != 1 else ''} in matching.json")
+            self._more.setVisible(True)
+
+    def _row(self, position: int, group) -> QWidget:
+        match = group.representative
+        candidate = match.candidate
+
+        head = QLabel(self._headline(position, group, match))
+        head.setObjectName("SourceMeta")
+        head.setWordWrap(True)
+        _wrapping(head)
+
+        domain = QLabel(candidate.source_domain or NONE_YET)
+        domain.setObjectName("SourceTitle")
+        domain.setWordWrap(True)
+        _wrapping(domain)
+
+        url = QLabel(candidate.url or "")
+        url.setObjectName("SourceUrl")
+        url.setWordWrap(True)
+        url.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        _wrapping(url)
+
+        row = QWidget()
+        box = QVBoxLayout(row)
+        box.setContentsMargins(0, 0, 0, 0)
+        box.setSpacing(2)
+        box.addWidget(head)
+        box.addWidget(domain)
+        box.addWidget(url)
+
+        self._rows.append(row)
+        return row
+
+    @staticmethod
+    def _headline(position: int, group, match) -> str:
+        similarity = match.best_similarity
+        bits = [f"#{position}"]
+        if similarity is not None:
+            bits.append(f"{similarity:.4f} cosine")
+        bits.append(match.status.value)
+        if group.duplicates:
+            n = len(group.duplicates)
+            bits.append(f"+{n} duplicate{'s' if n != 1 else ''}")
+        return "  ·  ".join(bits)
+
+    # -- inspection (used by tests) -------------------------------------
+
+    def source_count(self) -> int:
+        return self._count
+
+    def urls_shown(self) -> list[str]:
+        """Exactly the URL strings on screen, so a test can prove none is cut."""
+        out = []
+        for row in self._rows:
+            for child in row.findChildren(QLabel):
+                if child.objectName() == "SourceUrl":
+                    out.append(child.text())
+                    break
+        return out
+
+
 class ResultPanel(QWidget):
     """The whole results column."""
 
@@ -556,6 +690,7 @@ class ResultPanel(QWidget):
         self.verdict = VerdictBanner()
         self.summary = MatchSummary()
         self.source = SourceCard()
+        self.sources = SourcesCard()
         self.details = DetailsPanel()
         self.source.openRequested.connect(self.openSourceRequested)
 
@@ -565,6 +700,7 @@ class ResultPanel(QWidget):
         layout.addWidget(self.verdict)
         layout.addWidget(self.summary)
         layout.addWidget(self.source)
+        layout.addWidget(self.sources)
         layout.addWidget(self.details)
         layout.addStretch(1)
 
@@ -583,6 +719,7 @@ class ResultPanel(QWidget):
                                 "Stages will complete as the pipeline reports them.")
         self.summary.reset()
         self.source.reset()
+        self.sources.reset()
         self.details.reset()
 
     def clear(self) -> None:
@@ -590,6 +727,7 @@ class ResultPanel(QWidget):
                                 "Select an image and start an investigation.")
         self.summary.reset()
         self.source.reset()
+        self.sources.reset()
         self.details.reset()
 
     def show_failure(self, headline: str, detail: str = "") -> None:
@@ -602,6 +740,9 @@ class ResultPanel(QWidget):
         self.details.set_value("evidence SHA-256", result.evidence_sha256, copyable=True)
         self.details.set_value("evidence bundle", result.bundle_path, copyable=True)
         self.details.set_value("elapsed", f"{result.elapsed_seconds:.1f}s")
+
+        # Every independent source, with full URLs. Empty list -> empty card.
+        self.sources.show_sources(result.ranked)
 
         match = result.match
         if match is not None:

@@ -29,7 +29,7 @@ from __future__ import annotations
 import sys
 import threading
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Iterator
 
 WIDTH = 60
@@ -67,6 +67,10 @@ class RunResult:
     receipt: Any = None
     # src.blockchain.verifier.ChainVerification, or None with --no-chain
     verification: Any = None
+    # list[src.models.MatchGroup] - every independent source, strongest first.
+    # The same objects the CLI lists; carried so a front end can show all of
+    # them instead of only the anchored one.
+    ranked: list[Any] = field(default_factory=list)
 
     @property
     def verified(self) -> bool:
