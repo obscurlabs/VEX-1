@@ -44,15 +44,51 @@ class CandidateRetriever:
         return s
 
     def fetch_one(self, candidate: SearchCandidate, session: requests.Session) -> CandidateResult:
-        """Retrieve a single candidate. Never raises."""
-        result = CandidateResult(candidate=candidate)
-        url = candidate.best_image_url
-        started = time.perf_counter()
+        """Retrieve a single candidate, trying each image URL in turn.
 
-        if not url:
+        The provider often supplies two URLs for one result. Stopping at the
+        first is what silenced every Meta and TikTok candidate: their primary
+        URL serves a consent wall, while the thumbnail beside it is a usable
+        image. So each URL is tried until one yields a decodable image; every
+        failed attempt is recorded on the result rather than dropped, and the
+        last attempt's status is what the candidate reports if all fail.
+
+        Never raises.
+        """
+        urls = candidate.image_urls
+        if not urls:
+            result = CandidateResult(candidate=candidate)
             result.status = CandidateStatus.NO_IMAGE_URL
             result.detail = "provider gave no image or thumbnail URL"
             return result
+
+        history: list[dict] = []
+        result = CandidateResult(candidate=candidate)
+        for index, url in enumerate(urls):
+            result = self._fetch_url(candidate, session, url)
+            if result.ok:
+                break
+            # Keep what went wrong, so a reader can see the whole attempt path.
+            history.append({
+                "url": url,
+                "status": result.status.value,
+                "http_status": result.http_status,
+                "content_type": result.content_type,
+                "detail": result.detail,
+            })
+            if index + 1 < len(urls):
+                self.log(f"  {candidate.source_domain or '?'}: "
+                         f"{result.status.value} from the provider image URL, "
+                         f"trying its thumbnail")
+        result.attempts = history
+        return result
+
+    def _fetch_url(self, candidate: SearchCandidate, session: requests.Session,
+                   url: str) -> CandidateResult:
+        """One HTTP attempt against one URL. Never raises."""
+        result = CandidateResult(candidate=candidate)
+        result.image_url_used = url
+        started = time.perf_counter()
 
         try:
             with session.get(

@@ -172,6 +172,16 @@ def server():
     httpd.shutdown()
 
 
+def _fetch(candidate) -> "CandidateResult":
+    """Retrieve one candidate using the retriever's own configured session."""
+    retriever = CandidateRetriever()
+    session = retriever._session()
+    try:
+        return retriever.fetch_one(candidate, session)
+    finally:
+        session.close()
+
+
 def _candidate(url: str, pos: int = 1) -> SearchCandidate:
     return SearchCandidate(
         url=url, title="t", source_domain="127.0.0.1",
@@ -279,3 +289,104 @@ def test_result_serialization_is_json_safe(server):
     payload = json.dumps(r.to_dict())
     assert "RETRIEVED" in payload
     assert "image" not in json.loads(payload), "decoded pixels are not serialized"
+
+
+# --- ordered image-URL fallback -----------------------------------------
+#
+# The provider hands us two URLs per result. Choosing on presence rather than
+# on success is what silenced every Meta and TikTok candidate: their primary
+# URL serves a consent wall while a usable thumbnail sits beside it.
+
+def _two_url_candidate(primary: str, thumb: str) -> SearchCandidate:
+    return SearchCandidate(
+        url="https://social.example/post/1", title="t",
+        source_domain="social.example", image_url=primary,
+        thumbnail_url=thumb, position=1, provider="google_lens")
+
+
+def test_image_urls_are_ordered_primary_then_thumbnail():
+    c = _two_url_candidate("https://cdn/a.jpg", "https://tbn/b.jpg")
+    assert c.image_urls == ["https://cdn/a.jpg", "https://tbn/b.jpg"]
+
+
+def test_image_urls_deduplicates_identical_urls():
+    c = _two_url_candidate("https://cdn/a.jpg", "https://cdn/a.jpg")
+    assert c.image_urls == ["https://cdn/a.jpg"]
+
+
+def test_image_urls_is_empty_when_the_provider_gave_nothing():
+    c = SearchCandidate(url="https://a.example/p", title="t",
+                        source_domain="a.example", image_url=None,
+                        thumbnail_url=None, position=1, provider="google_lens")
+    assert c.image_urls == []
+    assert c.best_image_url is None
+
+
+def test_html_primary_falls_back_to_the_thumbnail(server):
+    """The Meta case: primary returns a consent page, thumbnail is an image."""
+    base = server
+    c = _two_url_candidate(f"{base}/notanimage", f"{base}/ok.png")
+    result = _fetch(c)
+
+    assert result.status is CandidateStatus.RETRIEVED
+    assert result.image_url_used == f"{base}/ok.png"
+
+
+def test_the_failed_attempt_is_preserved_not_discarded(server):
+    base = server
+    c = _two_url_candidate(f"{base}/notanimage", f"{base}/ok.png")
+    result = _fetch(c)
+
+    assert len(result.attempts) == 1
+    attempt = result.attempts[0]
+    assert attempt["url"] == f"{base}/notanimage"
+    assert attempt["status"] == CandidateStatus.INVALID_IMAGE.value
+    assert attempt["content_type"] == "text/html"
+
+
+def test_a_403_primary_also_falls_back(server):
+    """TikTok's case: the primary is blocked outright."""
+    base = server
+    c = _two_url_candidate(f"{base}/forbidden", f"{base}/ok.png")
+    result = _fetch(c)
+
+    assert result.status is CandidateStatus.RETRIEVED
+    assert result.attempts[0]["status"] == CandidateStatus.HTTP_403.value
+
+
+def test_a_working_primary_is_never_second_guessed(server):
+    """No extra request when the first URL already worked."""
+    base = server
+    c = _two_url_candidate(f"{base}/ok.png", f"{base}/ok.png")
+    result = _fetch(c)
+
+    assert result.status is CandidateStatus.RETRIEVED
+    assert result.image_url_used == f"{base}/ok.png"
+    assert result.attempts == []
+
+
+def test_when_every_url_fails_the_last_status_is_reported(server):
+    base = server
+    c = _two_url_candidate(f"{base}/forbidden", f"{base}/missing")
+    result = _fetch(c)
+
+    assert not result.ok
+    assert result.status is CandidateStatus.HTTP_404
+    assert [a["status"] for a in result.attempts] == [
+        CandidateStatus.HTTP_403.value, CandidateStatus.HTTP_404.value]
+
+
+def test_no_image_url_still_reported_when_provider_gave_none():
+    c = SearchCandidate(url="https://a.example/p", title="t",
+                        source_domain="a.example", image_url=None,
+                        thumbnail_url=None, position=1, provider="google_lens")
+    result = _fetch(c)
+    assert result.status is CandidateStatus.NO_IMAGE_URL
+
+
+def test_retrieval_records_which_url_produced_the_bytes(server):
+    base = server
+    c = _two_url_candidate(f"{base}/notanimage", f"{base}/ok.png")
+    payload = _fetch(c).to_dict()
+    assert payload["image_url_used"] == f"{base}/ok.png"
+    assert payload["attempts"][0]["status"] == CandidateStatus.INVALID_IMAGE.value

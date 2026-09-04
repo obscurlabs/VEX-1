@@ -132,3 +132,78 @@ def test_l2_normalize_rejects_zero_vector():
 def test_l2_normalize_produces_unit_norm():
     v = np.arange(1, EMBEDDING_DIM + 1, dtype=np.float32)
     assert float(np.linalg.norm(l2_normalize(v))) == pytest.approx(1.0, abs=1e-6)
+
+
+# --- decoder reach ------------------------------------------------------
+#
+# This OpenCV build ships no AVIF decoder. News publishers serve AVIF widely,
+# and 108 candidates across the stored evidence were downloaded intact and
+# then discarded for that reason alone. Pillow, already a dependency, reads it.
+
+def _avif_bytes(width: int = 200, height: int = 150) -> bytes:
+    from io import BytesIO
+    from PIL import Image
+    buf = BytesIO()
+    Image.new("RGB", (width, height), (30, 90, 160)).save(buf, format="AVIF")
+    return buf.getvalue()
+
+
+def test_this_opencv_build_really_cannot_read_avif():
+    """Pins the premise. If OpenCV gains AVIF, the fallback is merely unused."""
+    import cv2
+    assert cv2.haveImageReader("x.avif") is False
+
+
+def test_avif_bytes_decode_through_the_fallback():
+    import pytest
+    from PIL import features
+    if not features.check("avif"):
+        pytest.skip("Pillow built without AVIF")
+
+    data = _avif_bytes()
+    assert cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR) is None
+    img = quality.decode_array(data)
+    assert img is not None
+    assert img.shape == (150, 200, 3)
+
+
+def test_avif_passes_the_normal_validation_path():
+    import pytest
+    from PIL import features
+    if not features.check("avif"):
+        pytest.skip("Pillow built without AVIF")
+
+    status, img, err = quality.decode_bytes(_avif_bytes())
+    assert status is ImageStatus.OK
+    assert img is not None and err is None
+
+
+def test_avif_still_obeys_the_minimum_size_gate():
+    import pytest
+    from PIL import features
+    if not features.check("avif"):
+        pytest.skip("Pillow built without AVIF")
+
+    status, img, _ = quality.decode_bytes(_avif_bytes(40, 30))
+    assert status is ImageStatus.TOO_SMALL
+    assert img is None
+
+
+def test_jpeg_still_decodes_through_opencv_unchanged():
+    """The fallback must not change what already worked."""
+    img = np.zeros((80, 100, 3), dtype=np.uint8)
+    img[:, :] = (10, 20, 30)
+    data = cv2.imencode(".jpg", img)[1].tobytes()
+    out = quality.decode_array(data)
+    assert out is not None and out.shape == (80, 100, 3)
+
+
+def test_undecodable_bytes_are_still_rejected_by_both_decoders():
+    assert quality.decode_array(b"this is not an image at all") is None
+    status, img, err = quality.decode_bytes(b"this is not an image at all")
+    assert status is ImageStatus.INVALID_IMAGE
+    assert img is None and err
+
+
+def test_empty_bytes_return_none():
+    assert quality.decode_array(b"") is None

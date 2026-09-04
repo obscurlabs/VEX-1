@@ -329,7 +329,31 @@ def test_manifest_with_ranked_matches_is_canonicalizable():
 def test_schema_version_records_the_new_shape():
     from src.evidence import manifest
 
-    assert manifest.SCHEMA_VERSION == "1.1.0"
+    assert manifest.SCHEMA_VERSION == "1.2.0"
+
+
+def test_match_record_states_which_url_produced_the_bytes():
+    """1.2.0: provenance of the retrieved image is part of the evidence.
+
+    A platform CDN corroborates that the media belongs to that platform; the
+    search provider's cached thumbnail does not. A reader must be able to tell
+    them apart without re-fetching anything.
+    """
+    from src.evidence import manifest
+
+    match = make_match(0.9, "example.com")
+    match.retrieval.image_url_used = "https://cdn.example.com/real.jpg"
+    record = manifest._match_record(match, "selected_match")
+
+    assert record["retrieved_from"] == "https://cdn.example.com/real.jpg"
+
+
+def test_match_record_reports_absent_provenance_as_none():
+    from src.evidence import manifest
+
+    match = make_match(0.9, "example.com")
+    match.retrieval = None
+    assert manifest._match_record(match, "selected_match")["retrieved_from"] is None
 
 
 # --- similarity is never a probability ------------------------------------

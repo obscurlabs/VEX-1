@@ -26,9 +26,12 @@ from . import hashing
 
 SCHEMA = "hhgoa-task3/evidence-manifest"
 # 1.1.0 adds matching.ranked_matches, plus content_sha256 and retrieval_status
-# on every match record. Manifests of either version verify against their own
-# recorded fingerprint; the version states which shape was hashed.
-SCHEMA_VERSION = "1.1.0"
+# on every match record. 1.2.0 adds retrieved_from: which of the candidate's
+# image URLs actually produced the bytes, so a reader can tell a platform CDN
+# from the search provider's own cached thumbnail. Manifests of any version
+# verify against their own recorded fingerprint; the version states which
+# shape was hashed.
+SCHEMA_VERSION = "1.2.0"
 
 # Files covered by the manifest's artifact digests, in a fixed order that
 # never depends on directory listing order.
@@ -106,6 +109,10 @@ def _match_record(match: CandidateMatch, role: str,
         retrieval.content_type if retrieval is not None else None)
     record["bytes_downloaded"] = (
         retrieval.bytes_downloaded if retrieval is not None else None)
+    # Provenance of the bytes: a platform CDN corroborates that the media
+    # belongs to that platform; a provider thumbnail does not.
+    record["retrieved_from"] = (
+        retrieval.image_url_used if retrieval is not None else None)
 
     if image_file:
         record["image_file"] = image_file

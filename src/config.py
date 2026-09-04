@@ -78,7 +78,12 @@ class RetrievalConfig:
     """Fetching candidate images. Bounded so we do not hammer other people's
     servers, and capped so one huge file cannot stall the run."""
 
-    max_candidates: int = _i("MAX_CANDIDATES", 25)
+    # 25 reached only ~54% of the social-platform results the provider
+    # returns: Instagram/Facebook/Reddit sit around position 20, but Pinterest
+    # (median 35) and Flickr (42) were mostly unreachable. visual_matches is
+    # 58-60 rows, so 60 covers essentially all of it. Measured cost of the
+    # rise from 45 to 60 is ~2s; the anchored fingerprint stays 32 bytes.
+    max_candidates: int = _i("MAX_CANDIDATES", 60)
     concurrency: int = _i("RETRIEVAL_CONCURRENCY", 5)
     # requests applies a scalar timeout to connect AND read separately, so a
     # single value of N actually bounds a request at ~2N. Split them so the

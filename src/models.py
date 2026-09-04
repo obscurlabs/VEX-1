@@ -184,6 +184,27 @@ class SearchCandidate:
         """Full-resolution image if the provider gave one, else the thumbnail."""
         return self.image_url or self.thumbnail_url
 
+    @property
+    def image_urls(self) -> list[str]:
+        """Every image URL the provider gave, best-quality first.
+
+        ``best_image_url`` picks on *presence*: a candidate that carries an
+        ``image`` URL never falls back, even when that URL serves something
+        undecodable. Meta and TikTok always carry one, pointing at a consent
+        wall (``lookaside.instagram.com``, ``lookaside.fbsbx.com``) or at the
+        page itself, so their perfectly usable provider thumbnail was
+        unreachable. Retrieval walks this list and keeps the first URL that
+        yields a decodable image, which picks on *success* instead.
+        """
+        ordered = [self.image_url, self.thumbnail_url]
+        seen: set[str] = set()
+        out: list[str] = []
+        for url in ordered:
+            if url and url not in seen:
+                seen.add(url)
+                out.append(url)
+        return out
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "position": self.position,
@@ -209,6 +230,13 @@ class CandidateResult:
     bytes_downloaded: int = 0
     elapsed_ms: float = 0.0
     image_size: tuple[int, int] | None = None
+    # Which of the candidate's image URLs actually produced these bytes. Worth
+    # recording: a platform CDN corroborates that the media belongs to that
+    # platform, while a provider thumbnail is the search engine's own cache.
+    image_url_used: str | None = None
+    # Every URL tried that did not yield a decodable image, with its reason.
+    # Failed attempts are preserved rather than discarded.
+    attempts: list[dict[str, Any]] = field(default_factory=list)
     image: Any = field(default=None, repr=False, compare=False)
     # The exact bytes downloaded, kept so the evidence bundle can store the
     # candidate image verbatim rather than a re-encoded copy.
@@ -229,6 +257,8 @@ class CandidateResult:
             "bytes_downloaded": self.bytes_downloaded,
             "elapsed_ms": round(self.elapsed_ms, 1),
             "image_size": list(self.image_size) if self.image_size else None,
+            "image_url_used": self.image_url_used,
+            "attempts": self.attempts,
         }
 
 
